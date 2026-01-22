@@ -1,0 +1,485 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5F5ED9CE2F1772900097781C /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 5F5ED9CD2F1772900097781C /* SwiftTerm */; };
+		AA0001 /* VibeyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000 /* VibeyApp.swift */; };
+		AA0003 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0002 /* AppState.swift */; };
+		AA0005 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0004 /* Project.swift */; };
+		AA0007 /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0006 /* Page.swift */; };
+		AA0009 /* Prompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0008 /* Prompt.swift */; };
+		AA0011 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0010 /* DesignSystem.swift */; };
+		AA0013 /* VibeyLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0012 /* VibeyLogo.swift */; };
+		AA0021 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0020 /* OnboardingView.swift */; };
+		AA0023 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0022 /* PaywallView.swift */; };
+		AA0025 /* FirstProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0024 /* FirstProjectView.swift */; };
+		AA0027 /* ClaudeCodeCheckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0026 /* ClaudeCodeCheckView.swift */; };
+		AA0029 /* MainContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0028 /* MainContentView.swift */; };
+		AA0031 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0030 /* Assets.xcassets */; };
+		AA0034 /* TerminalState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0033 /* TerminalState.swift */; };
+		AA0036 /* SwiftTermWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0035 /* SwiftTermWrapper.swift */; };
+		AA0038 /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0037 /* TerminalView.swift */; };
+		AA0040 /* ProjectsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0039 /* ProjectsListView.swift */; };
+		AA0042 /* ClaudeCodeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0041 /* ClaudeCodeDetector.swift */; };
+		AA0044 /* ClaudeCodeSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0043 /* ClaudeCodeSetupView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AA0000 /* VibeyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeyApp.swift; sourceTree = "<group>"; };
+		AA0002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		AA0004 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		AA0006 /* Page.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Page.swift; sourceTree = "<group>"; };
+		AA0008 /* Prompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompt.swift; sourceTree = "<group>"; };
+		AA0010 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		AA0012 /* VibeyLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeyLogo.swift; sourceTree = "<group>"; };
+		AA0020 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		AA0022 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		AA0024 /* FirstProjectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstProjectView.swift; sourceTree = "<group>"; };
+		AA0026 /* ClaudeCodeCheckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCodeCheckView.swift; sourceTree = "<group>"; };
+		AA0028 /* MainContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainContentView.swift; sourceTree = "<group>"; };
+		AA0030 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA0032 /* Vibey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vibey.entitlements; sourceTree = "<group>"; };
+		AA0033 /* TerminalState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalState.swift; sourceTree = "<group>"; };
+		AA0035 /* SwiftTermWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftTermWrapper.swift; sourceTree = "<group>"; };
+		AA0037 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
+		AA0039 /* ProjectsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsListView.swift; sourceTree = "<group>"; };
+		AA0041 /* ClaudeCodeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCodeDetector.swift; sourceTree = "<group>"; };
+		AA0043 /* ClaudeCodeSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCodeSetupView.swift; sourceTree = "<group>"; };
+		AAAAAA /* Vibey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vibey.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AAAAAB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F5ED9CE2F1772900097781C /* SwiftTerm in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AAAAAC = {
+			isa = PBXGroup;
+			children = (
+				AAAAAD /* Products */,
+				AAAAAE /* Vibey */,
+			);
+			sourceTree = "<group>";
+		};
+		AAAAAD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AAAAAA /* Vibey.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AAAAAE /* Vibey */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000 /* VibeyApp.swift */,
+				AA0032 /* Vibey.entitlements */,
+				AAAAAF /* Models */,
+				AAAAB0 /* ViewModels */,
+				AAAAB1 /* Views */,
+				AAAAB2 /* Services */,
+				AAAAB3 /* Utilities */,
+				AAAAB4 /* Fonts */,
+				AA0030 /* Assets.xcassets */,
+			);
+			path = Vibey;
+			sourceTree = "<group>";
+		};
+		AAAAAF /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AA0004 /* Project.swift */,
+				AA0006 /* Page.swift */,
+				AA0008 /* Prompt.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AAAAB0 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				AA0002 /* AppState.swift */,
+				AA0033 /* TerminalState.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		AAAAB1 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AA0028 /* MainContentView.swift */,
+				AA0039 /* ProjectsListView.swift */,
+				AA0043 /* ClaudeCodeSetupView.swift */,
+				AAAAB6 /* Onboarding */,
+				AAAAB7 /* Components */,
+				AAAAB8 /* Terminal */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		AAAAB2 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				AA0041 /* ClaudeCodeDetector.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		AAAAB3 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				AA0010 /* DesignSystem.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		AAAAB4 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		AAAAB6 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				AA0020 /* OnboardingView.swift */,
+				AA0022 /* PaywallView.swift */,
+				AA0024 /* FirstProjectView.swift */,
+				AA0026 /* ClaudeCodeCheckView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		AAAAB7 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				AA0012 /* VibeyLogo.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		AAAAB8 /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				AA0035 /* SwiftTermWrapper.swift */,
+				AA0037 /* TerminalView.swift */,
+			);
+			path = Terminal;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AAAAA9 /* Vibey */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AAAAA8 /* Build configuration list for PBXNativeTarget "Vibey" */;
+			buildPhases = (
+				AAAAA6 /* Sources */,
+				AAAAAB /* Frameworks */,
+				AAAAA7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Vibey;
+			productName = Vibey;
+			productReference = AAAAAA /* Vibey.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AAAAA1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = AAAAA4 /* Build configuration list for PBXProject "Vibey" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = AAAAAC;
+			packageReferences = (
+				5F5ED9CC2F1772900097781C /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+			);
+			productRefGroup = AAAAAD /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AAAAA9 /* Vibey */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AAAAA7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0031 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AAAAA6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0001 /* VibeyApp.swift in Sources */,
+				AA0003 /* AppState.swift in Sources */,
+				AA0005 /* Project.swift in Sources */,
+				AA0007 /* Page.swift in Sources */,
+				AA0009 /* Prompt.swift in Sources */,
+				AA0011 /* DesignSystem.swift in Sources */,
+				AA0013 /* VibeyLogo.swift in Sources */,
+				AA0021 /* OnboardingView.swift in Sources */,
+				AA0023 /* PaywallView.swift in Sources */,
+				AA0025 /* FirstProjectView.swift in Sources */,
+				AA0027 /* ClaudeCodeCheckView.swift in Sources */,
+				AA0029 /* MainContentView.swift in Sources */,
+				AA0040 /* ProjectsListView.swift in Sources */,
+				AA0042 /* ClaudeCodeDetector.swift in Sources */,
+				AA0044 /* ClaudeCodeSetupView.swift in Sources */,
+				AA0034 /* TerminalState.swift in Sources */,
+				AA0036 /* SwiftTermWrapper.swift in Sources */,
+				AA0038 /* TerminalView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AAAAA2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AAAAA3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		AAAAA5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Vibey/Vibey.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 86C4Q5A7DB;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Vibey/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Vibey;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = vibey.code;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AAAAA7ALT /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Vibey/Vibey.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 86C4Q5A7DB;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Vibey/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Vibey;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = vibey.code;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AAAAA4 /* Build configuration list for PBXProject "Vibey" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAAAA2 /* Debug */,
+				AAAAA3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AAAAA8 /* Build configuration list for PBXNativeTarget "Vibey" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAAAA5 /* Debug */,
+				AAAAA7ALT /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5F5ED9CC2F1772900097781C /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5F5ED9CD2F1772900097781C /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5F5ED9CC2F1772900097781C /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = AAAAA1 /* Project object */;
+}
