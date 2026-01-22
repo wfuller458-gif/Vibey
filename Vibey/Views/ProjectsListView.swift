@@ -70,7 +70,7 @@ struct ProjectsListView: View {
                     // Header with title and create button
                     HStack {
                         Text("Your Projects")
-                            .font(.lexendRegular(size: 32))
+                            .font(.lexendBold(size: 32))
                             .foregroundColor(.vibeyText)
 
                         Spacer()
@@ -136,6 +136,7 @@ struct ProjectsListView: View {
                         appState.createProject(name: newProjectName)
                         newProjectName = ""
                         showingCreateProject = false
+                        showingProjectsList.wrappedValue = false
                     }
                 },
                 onCancel: {
@@ -276,7 +277,7 @@ struct CreateProjectSheet: View {
         VStack(spacing: 32) {
             VStack(spacing: 8) {
                 Text("New Project")
-                    .font(.lexendRegular(size: 32))
+                    .font(.lexendBold(size: 32))
                     .foregroundColor(.vibeyText)
                     .kerning(4.8)
 
@@ -299,6 +300,11 @@ struct CreateProjectSheet: View {
                         .stroke(Color.vibeyCardBorder, lineWidth: 1)
                 )
                 .focused($isTextFieldFocused)
+                .onSubmit {
+                    if !projectName.isEmpty {
+                        onCreate()
+                    }
+                }
 
             // Buttons
             HStack(spacing: 16) {

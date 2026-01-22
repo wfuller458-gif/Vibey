@@ -73,7 +73,7 @@ struct FirstProjectView: View {
                     VStack(spacing: 32) {
                         VStack(spacing: 8) {
                             Text("New Project")
-                                .font(.lexendRegular(size: 32))
+                                .font(.lexendBold(size: 32))
                                 .foregroundColor(.vibeyText)
                                 .kerning(4.8)
                                 .lineSpacing(1.35)
@@ -98,6 +98,12 @@ struct FirstProjectView: View {
                                     .stroke(Color.vibeyCardBorder, lineWidth: 1)
                             )
                             .focused($isTextFieldFocused)
+                            .onSubmit {
+                                if !projectName.isEmpty {
+                                    appState.createProject(name: projectName)
+                                    onComplete()
+                                }
+                            }
                     }
 
                     // Buttons
