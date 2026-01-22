@@ -104,6 +104,19 @@ class AppState: ObservableObject {
         saveProjects()
     }
 
+    func renameProject(_ projectID: UUID, newName: String) {
+        guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
+        projects[index].name = newName
+        projects[index].updatedAt = Date()
+
+        // Update currentProject if it's the one being renamed
+        if currentProject?.id == projectID {
+            currentProject = projects[index]
+        }
+
+        saveProjects()
+    }
+
     // MARK: - Page Methods
 
     func addPage(_ page: Page, to projectID: UUID) {

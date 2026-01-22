@@ -111,6 +111,7 @@ struct ProjectsListView: View {
                                         appState.deleteProject(project)
                                     }
                                 )
+                                .environmentObject(appState)
                             }
                         }
                     }
@@ -149,66 +150,101 @@ struct ProjectsListView: View {
 // MARK: - Project Row
 
 struct ProjectRow: View {
+    @EnvironmentObject var appState: AppState
     let project: Project
     let isSelected: Bool
     let onSelect: () -> Void
     let onDelete: () -> Void
 
     @State private var showingMenu = false
+    @State private var showingEditDialog = false
+    @State private var showingDeleteConfirmation = false
+    @State private var editedName = ""
+    @State private var isHovered = false
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 16) {
-                // Cube icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 0)
-                        .stroke(Color.white.opacity(0.6), lineWidth: 1)
-                        .frame(width: 32, height: 32)
-                        .background(Color(hex: "1C1E22"))
+        HStack(spacing: 16) {
+            // Cube icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 0)
+                    .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                    .frame(width: 32, height: 32)
+                    .background(Color(hex: "1C1E22"))
 
-                    Image(systemName: "cube")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
-                }
-
-                // Project info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(project.name)
-                        .font(.lexendBold(size: 20))
-                        .foregroundColor(Color(hex: "EEEEEE"))
-                        .kerning(1.4)
-
-                    Text("Last edited \(timeAgo(project.updatedAt))")
-                        .font(.atkinsonRegular(size: 12))
-                        .foregroundColor(Color(hex: "EEEEEE"))
-                        .kerning(0.84)
-                }
-
-                Spacer()
-
-                // More menu button
-                Button(action: { showingMenu = true }) {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.plain)
+                Image(systemName: "cube")
+                    .font(.system(size: 16))
+                    .foregroundColor(.white)
             }
-            .padding(24)
-            .background(isSelected ? Color(hex: "1C1E22") : Color.clear)
-            .cornerRadius(8)
+
+            // Project info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(project.name)
+                    .font(.lexendBold(size: 20))
+                    .foregroundColor(Color(hex: "EEEEEE"))
+                    .kerning(1.4)
+
+                Text("Last edited \(timeAgo(project.updatedAt))")
+                    .font(.atkinsonRegular(size: 12))
+                    .foregroundColor(Color(hex: "EEEEEE"))
+                    .kerning(0.84)
+            }
+
+            Spacer()
+
+            // More menu button
+            Image("More")
+                .resizable()
+                .frame(width: 24, height: 24)
+                .foregroundColor(.white)
+                .onTapGesture {
+                    showingMenu = true
+                }
         }
-        .buttonStyle(.plain)
-        .confirmationDialog("Project Options", isPresented: $showingMenu) {
-            Button("Open Project") {
-                onSelect()
+        .padding(24)
+        .background(isHovered ? Color(hex: "1C1E22") : Color.clear)
+        .cornerRadius(8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onSelect()
+        }
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .confirmationDialog("", isPresented: $showingMenu, titleVisibility: .hidden) {
+            Button("Edit") {
+                editedName = project.name
+                showingEditDialog = true
             }
-            Button("Delete Project", role: .destructive) {
-                onDelete()
+            Button("Delete", role: .destructive) {
+                showingDeleteConfirmation = true
             }
             Button("Cancel", role: .cancel) { }
         }
+        .alert("Edit Project Name", isPresented: $showingEditDialog) {
+            TextField("Project name", text: $editedName)
+            Button("Cancel", role: .cancel) {
+                editedName = ""
+            }
+            Button("Save") {
+                if !editedName.isEmpty {
+                    renameProject()
+                }
+            }
+        } message: {
+            Text("Enter a new name for this project")
+        }
+        .alert("Delete Project?", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(project.name)\"? This action cannot be undone.")
+        }
+    }
+
+    private func renameProject() {
+        appState.renameProject(project.id, newName: editedName)
     }
 
     private func timeAgo(_ date: Date) -> String {
