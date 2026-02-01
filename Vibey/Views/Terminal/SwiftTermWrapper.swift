@@ -10,16 +10,56 @@ import SwiftUI
 import SwiftTerm
 import Combine
 
+// MARK: - Custom Terminal View with Drag & Drop Support
+class DraggableTerminalView: LocalProcessTerminalView {
+    var onFilesDropped: (([URL]) -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupDragAndDrop()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupDragAndDrop()
+    }
+
+    private func setupDragAndDrop() {
+        registerForDraggedTypes([.fileURL, .URL])
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        if sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) {
+            return .copy
+        }
+        return []
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] else {
+            return false
+        }
+
+        onFilesDropped?(urls)
+        return true
+    }
+}
+
 struct SwiftTermWrapper: NSViewRepresentable {
     @ObservedObject var terminalState: TerminalState
+    let isComicSansMode: Bool
     let onBell: () -> Void
 
-    func makeNSView(context: Context) -> LocalProcessTerminalView {
-        let terminalView = LocalProcessTerminalView(frame: .zero)
+    func makeNSView(context: Context) -> DraggableTerminalView {
+        let terminalView = DraggableTerminalView(frame: .zero)
 
         // Configure terminal appearance
-        // Use SF Mono for proper monospace terminal display
-        terminalView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        // Use Comic Sans if in that mode, otherwise SF Mono
+        if isComicSansMode {
+            terminalView.font = NSFont(name: "Comic Sans MS", size: 13) ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        } else {
+            terminalView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        }
 
         // Set dark theme colors matching Vibey design - must match page background #121418
         // Using explicit RGB values to ensure exact color match
@@ -33,13 +73,23 @@ struct SwiftTermWrapper: NSViewRepresentable {
         terminalView.layer?.backgroundColor = backgroundColor.cgColor
         terminalView.layer?.isOpaque = true
 
+        // Disable mouse reporting so text selection always works
+        // (mouse-aware CLI apps won't hijack selection)
+        terminalView.allowMouseReporting = false
+
+        // Handle file drops - send paths to terminal
+        terminalView.onFilesDropped = { urls in
+            let paths = urls.map { $0.path }.joined(separator: " ")
+            context.coordinator.sendToTerminal(paths)
+        }
+
         // Start shell process
         context.coordinator.startShell(in: terminalView)
 
         return terminalView
     }
 
-    func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {
+    func updateNSView(_ nsView: DraggableTerminalView, context: Context) {
         // Update terminal if needed when state changes
     }
 
@@ -50,7 +100,7 @@ struct SwiftTermWrapper: NSViewRepresentable {
     class Coordinator: NSObject {
         var terminalState: TerminalState
         let onBell: () -> Void
-        weak var terminalView: LocalProcessTerminalView?
+        weak var terminalView: DraggableTerminalView?
         private var cancellables = Set<AnyCancellable>()
 
         init(terminalState: TerminalState, onBell: @escaping () -> Void) {
@@ -71,7 +121,7 @@ struct SwiftTermWrapper: NSViewRepresentable {
                 .store(in: &cancellables)
         }
 
-        func startShell(in terminalView: LocalProcessTerminalView) {
+        func startShell(in terminalView: DraggableTerminalView) {
             // Store reference to terminal view
             self.terminalView = terminalView
 

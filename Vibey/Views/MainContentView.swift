@@ -10,82 +10,92 @@ import SwiftUI
 
 struct MainContentView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.isComicSansMode) var isComicSansMode
     @State private var selectedPageID: UUID? = nil
-    @State private var sidebarWidth: CGFloat = 200
+    @State private var sidebarWidth: CGFloat = 220
     @State private var terminalWidth: CGFloat = 400
 
     var body: some View {
-        GeometryReader { geometry in
-            HStack(spacing: 0) {
-                // Left Sidebar (resizable)
-                LeftSidebar(
-                    selectedPageID: $selectedPageID,
-                    onAddPage: {
-                        guard let project = appState.currentProject else { return }
-                        let newPage = Page(projectID: project.id)
-                        appState.addPage(newPage, to: project.id)
-                        selectedPageID = newPage.id
-                    },
-                    onSelectPage: { pageID in
-                        selectedPageID = pageID
-                    },
-                    onDeletePage: { pageID in
-                        guard let projectID = appState.currentProject?.id else { return }
-                        appState.deletePage(pageID, from: projectID)
+        Group {
+            if appState.projects.isEmpty {
+                // Show projects list with empty state
+                ProjectsListView()
+                    .environmentObject(appState)
+            } else {
+                // Normal 3-panel layout
+                GeometryReader { geometry in
+                    HStack(spacing: 0) {
+                        // Left Sidebar (resizable)
+                        LeftSidebar(
+                            selectedPageID: $selectedPageID,
+                            onAddPage: {
+                                guard let project = appState.currentProject else { return }
+                                let newPage = Page(projectID: project.id)
+                                appState.addPage(newPage, to: project.id)
+                                selectedPageID = newPage.id
+                            },
+                            onSelectPage: { pageID in
+                                selectedPageID = pageID
+                            },
+                            onDeletePage: { pageID in
+                                guard let projectID = appState.currentProject?.id else { return }
+                                appState.deletePage(pageID, from: projectID)
 
-                        // Update selection
-                        if selectedPageID == pageID {
-                            // Get updated project after deletion
-                            selectedPageID = appState.currentProject?.pages.first?.id
-                        }
-                    }
-                )
-                .frame(width: sidebarWidth)
-
-                // Draggable divider for sidebar
-                DraggableDivider(width: $sidebarWidth, minWidth: 180, maxWidth: 280)
-
-                // Middle Panel - Page Editor (flexible)
-                Group {
-                    if let pageID = selectedPageID,
-                       let projectIndex = appState.projects.firstIndex(where: { $0.id == appState.currentProject?.id }),
-                       let pageIndex = appState.projects[projectIndex].pages.firstIndex(where: { $0.id == pageID }) {
-                        PageEditorPanel(
-                            page: $appState.projects[projectIndex].pages[pageIndex],
-                            onSendContext: { page in
-                                sendPageContext(page)
+                                // Update selection
+                                if selectedPageID == pageID {
+                                    // Get updated project after deletion
+                                    selectedPageID = appState.currentProject?.pages.first?.id
+                                }
                             }
                         )
-                        .id(pageID) // Force view to refresh when switching pages
-                    } else {
-                        // Empty state when no page is selected
-                        VStack(spacing: 16) {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 48))
-                                .foregroundColor(.vibeyText.opacity(0.3))
+                        .frame(width: sidebarWidth)
 
-                            Text("No Page Selected")
-                                .font(.atkinsonRegular(size: 16))
-                                .foregroundColor(.vibeyText.opacity(0.7))
+                        // Draggable divider for sidebar
+                        DraggableDivider(width: $sidebarWidth, minWidth: 220, maxWidth: 280)
 
-                            Text("Create a new page to get started")
-                                .font(.atkinsonRegular(size: 14))
-                                .foregroundColor(.vibeyText.opacity(0.5))
+                        // Middle Panel - Page Editor (flexible)
+                        Group {
+                            if let pageID = selectedPageID,
+                               let projectIndex = appState.projects.firstIndex(where: { $0.id == appState.currentProject?.id }),
+                               let pageIndex = appState.projects[projectIndex].pages.firstIndex(where: { $0.id == pageID }) {
+                                PageEditorPanel(
+                                    page: $appState.projects[projectIndex].pages[pageIndex],
+                                    onSendContext: { page in
+                                        sendPageContext(page)
+                                    }
+                                )
+                                .id(pageID) // Force view to refresh when switching pages
+                            } else {
+                                // Empty state when no page is selected
+                                VStack(spacing: 16) {
+                                    Image(systemName: "doc.text")
+                                        .font(.system(size: 48))
+                                        .foregroundColor(.vibeyText.opacity(0.3))
+
+                                    Text("No Page Selected")
+                                        .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
+                                        .foregroundColor(.vibeyText.opacity(0.7))
+
+                                    Text("Create a new page to get started")
+                                        .font(.atkinsonRegular(size: 14, comicSans: isComicSansMode))
+                                        .foregroundColor(.vibeyText.opacity(0.5))
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color.vibeyBackground)
+                            }
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.vibeyBackground)
+                        .frame(width: geometry.size.width - sidebarWidth - terminalWidth - 48) // 48 for dividers (24px each)
+
+                        // Draggable divider for terminal
+                        DraggableDivider(width: $terminalWidth, minWidth: 300, maxWidth: 800, reverseDirection: true)
+
+                        // Right Panel - Terminal (resizable)
+                        TerminalPanel()
+                            .frame(width: terminalWidth)
                     }
+                    .background(Color.vibeyBackground)
                 }
-                .frame(width: geometry.size.width - sidebarWidth - terminalWidth - 48) // 48 for dividers (24px each)
-
-                // Draggable divider for terminal
-                DraggableDivider(width: $terminalWidth, minWidth: 300, maxWidth: 800, reverseDirection: true)
-
-                // Right Panel - Terminal (resizable)
-                TerminalPanel()
-                    .frame(width: terminalWidth)
             }
-            .background(Color.vibeyBackground)
         }
     }
 
@@ -120,6 +130,7 @@ struct MainContentView: View {
 struct LeftSidebar: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.showingProjectsList) var showingProjectsList
+    @Environment(\.isComicSansMode) var isComicSansMode
     @Binding var selectedPageID: UUID?
     let onAddPage: () -> Void
     let onSelectPage: (UUID) -> Void
@@ -127,7 +138,7 @@ struct LeftSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Logo
+            // Logo (keep brand consistent even in Comic Sans mode)
             HStack {
                 Image("VibeyLogo")
                     .resizable()
@@ -142,9 +153,11 @@ struct LeftSidebar: View {
             // Project name
             HStack(spacing: 8) {
                 Text(appState.currentProject?.name ?? "No Project")
-                    .font(.lexendBold(size: 16))
+                    .font(.lexendBold(size: 16, comicSans: isComicSansMode))
                     .foregroundColor(.white)
                     .kerning(1.12)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Spacer()
             }
@@ -155,7 +168,7 @@ struct LeftSidebar: View {
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 8) {
                     Text("PAGES")
-                        .font(.lexendLight(size: 12))
+                        .font(.lexendLight(size: 12, comicSans: isComicSansMode))
                         .foregroundColor(.white.opacity(0.6))
                         .kerning(0.84)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -187,11 +200,15 @@ struct LeftSidebar: View {
                 .padding(.horizontal, 8)
             }
 
-            // All Projects button at bottom (pinned)
-            VStack(spacing: 0) {
+            // Trial banner and All Projects button at bottom (pinned)
+            VStack(spacing: 12) {
+                // Trial banner (only shows if on trial)
+                TrialBannerView()
+                    .environmentObject(appState)
+
                 SidebarButton(
                     title: "All Projects",
-                    icon: "chevron.left",
+                    icon: "Back",
                     isSelected: false,
                     showClose: false,
                     action: {
@@ -211,6 +228,7 @@ struct LeftSidebar: View {
 
 // MARK: - Sidebar Button
 struct SidebarButton: View {
+    @Environment(\.isComicSansMode) var isComicSansMode
     let title: String
     let icon: String?
     let isSelected: Bool
@@ -226,10 +244,18 @@ struct SidebarButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if let icon = icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
-                        .frame(width: 24, height: 24)
+                    // Check if it's a custom asset (starts with uppercase) or SF Symbol
+                    if icon.first?.isUppercase == true {
+                        Image(icon)
+                            .resizable()
+                            .frame(width: 24, height: 24)
+                            .foregroundColor(.white)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .frame(width: 24, height: 24)
+                    }
                 } else if let status = statusIcon {
                     Image(statusImageName(for: status))
                         .resizable()
@@ -237,7 +263,7 @@ struct SidebarButton: View {
                 }
 
                 Text(title)
-                    .font(.atkinsonRegular(size: 16))
+                    .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
                     .foregroundColor(.white)
                     .kerning(1.12)
                     .lineLimit(1)
@@ -290,6 +316,7 @@ struct SidebarButton: View {
 
 // MARK: - Page Editor Panel
 struct PageEditorPanel: View {
+    @Environment(\.isComicSansMode) var isComicSansMode
     @Binding var page: Page
     let onSendContext: (Page) -> Void
     @FocusState private var isTitleFocused: Bool
@@ -303,7 +330,7 @@ struct PageEditorPanel: View {
             // Page title input
             TextField("Page Name + Press Enter", text: $page.title, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.lexendBold(size: 32))
+                .font(.lexendBold(size: 32, comicSans: isComicSansMode))
                 .lineSpacing(11.2)
                 .foregroundColor(.vibeyText)
                 .opacity(page.title.isEmpty ? 0.4 : 1.0)
@@ -321,7 +348,7 @@ struct PageEditorPanel: View {
                     .frame(width: 24, height: 24)
 
                 Text(statusText)
-                    .font(.atkinsonRegular(size: 12))
+                    .font(.atkinsonRegular(size: 12, comicSans: isComicSansMode))
                     .foregroundColor(statusTextColor)
                     .kerning(0.84)
             }
@@ -335,7 +362,7 @@ struct PageEditorPanel: View {
             }) {
                 HStack(spacing: 10) {
                     Text("Send Page Context")
-                        .font(.atkinsonRegular(size: 16))
+                        .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
                         .foregroundColor(.white)
                         .kerning(1.12)
 
@@ -358,7 +385,7 @@ struct PageEditorPanel: View {
             // Text editor
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $page.content)
-                    .font(.atkinsonRegular(size: 16))
+                    .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
                     .lineSpacing(8)
                     .foregroundColor(.vibeyText)
                     .scrollContentBackground(.hidden)
@@ -367,7 +394,7 @@ struct PageEditorPanel: View {
 
                 if page.content.isEmpty && !isContentFocused {
                     Text("Start typing")
-                        .font(.atkinsonRegular(size: 16))
+                        .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
                         .foregroundColor(.vibeyText.opacity(0.4))
                         .padding(.top, 8)
                         .padding(.leading, 5)
@@ -444,17 +471,18 @@ struct PageEditorPanel: View {
 // MARK: - Terminal Panel
 struct TerminalPanel: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.isComicSansMode) var isComicSansMode
 
     var body: some View {
         ZStack {
             // Keep all terminal instances alive in background
             ForEach(appState.projects) { project in
-                TerminalView(terminalState: project.terminalState, projectID: project.id)
+                TerminalView(terminalState: project.terminalState, projectID: project.id, isComicSansMode: isComicSansMode)
                     .environmentObject(appState)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .opacity(project.id == appState.currentProject?.id ? 1 : 0)
                     .allowsHitTesting(project.id == appState.currentProject?.id)
-                    .id(project.id) // Stable identity per project
+                    .id("\(project.id)-\(isComicSansMode)") // Force refresh when comic sans mode changes
             }
 
             // Show placeholder only when no projects exist
@@ -465,11 +493,11 @@ struct TerminalPanel: View {
                         .foregroundColor(.vibeyText.opacity(0.3))
 
                     Text("No Project Selected")
-                        .font(.atkinsonRegular(size: 16))
+                        .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
                         .foregroundColor(.vibeyText.opacity(0.7))
 
                     Text("Create or select a project to use the terminal")
-                        .font(.atkinsonRegular(size: 14))
+                        .font(.atkinsonRegular(size: 14, comicSans: isComicSansMode))
                         .foregroundColor(.vibeyText.opacity(0.5))
                         .multilineTextAlignment(.center)
                 }
