@@ -195,43 +195,33 @@ struct RichTextEditor: NSViewRepresentable {
         }
 
         private func convertToBulletList(textView: RichNSTextView, textStorage: NSTextStorage, paragraphStart: Int) {
-            let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
-            let markerFont = NSFont.systemFont(ofSize: 16)
-
+            // Delete "- " trigger text
             textStorage.beginEditing()
-            // Delete "- "
             textStorage.deleteCharacters(in: NSRange(location: paragraphStart, length: 2))
-            // Insert bullet marker
-            let markerAttrs: [NSAttributedString.Key: Any] = [
-                .font: markerFont,
-                .foregroundColor: textColor
-            ]
-            let bullet = NSAttributedString(string: "\u{2022}\t", attributes: markerAttrs)
-            textStorage.insert(bullet, at: paragraphStart)
             textStorage.endEditing()
 
-            textView.setSelectedRange(NSRange(location: paragraphStart + 2, length: 0))
-            textView.didChangeText()
+            // Position cursor at paragraph start
+            textView.setSelectedRange(NSRange(location: paragraphStart, length: 0))
+
+            // Defer applyBulletList to avoid re-entrancy issues with textDidChange
+            DispatchQueue.main.async {
+                textView.applyBulletList()
+            }
         }
 
         private func convertToNumberedList(textView: RichNSTextView, textStorage: NSTextStorage, paragraphStart: Int, triggerLength: Int) {
-            let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
-            let markerFont = NSFont.systemFont(ofSize: 16)
-
+            // Delete "1. " or similar trigger text
             textStorage.beginEditing()
-            // Delete "1. " or similar
             textStorage.deleteCharacters(in: NSRange(location: paragraphStart, length: triggerLength))
-            // Insert numbered marker
-            let markerAttrs: [NSAttributedString.Key: Any] = [
-                .font: markerFont,
-                .foregroundColor: textColor
-            ]
-            let number = NSAttributedString(string: "1.\t", attributes: markerAttrs)
-            textStorage.insert(number, at: paragraphStart)
             textStorage.endEditing()
 
-            textView.setSelectedRange(NSRange(location: paragraphStart + 3, length: 0))
-            textView.didChangeText()
+            // Position cursor at paragraph start
+            textView.setSelectedRange(NSRange(location: paragraphStart, length: 0))
+
+            // Defer applyNumberedList to avoid re-entrancy issues with textDidChange
+            DispatchQueue.main.async {
+                textView.applyNumberedList()
+            }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
