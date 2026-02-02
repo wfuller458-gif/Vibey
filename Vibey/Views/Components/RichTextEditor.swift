@@ -221,55 +221,40 @@ struct RichTextEditor: NSViewRepresentable {
 // MARK: - Custom NSTextView
 
 class RichNSTextView: NSTextView {
-    private var trackingArea: NSTrackingArea?
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
+    override func resetCursorRects() {
+        super.resetCursorRects()
 
-        if let existing = trackingArea {
-            removeTrackingArea(existing)
-        }
-
-        trackingArea = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(trackingArea!)
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-
-        if isPointOverCheckbox(point) {
-            NSCursor.pointingHand.set()
-        } else {
-            NSCursor.iBeam.set()
-        }
-
-        super.mouseMoved(with: event)
-    }
-
-    private func isPointOverCheckbox(_ point: NSPoint) -> Bool {
-        let charIndex = characterIndexForInsertion(at: point)
-        guard charIndex < string.count else { return false }
+        // Add pointer cursor rects for all checkboxes
+        guard let layoutManager = layoutManager, let textContainer = textContainer else { return }
 
         let nsString = string as NSString
-        let paragraphRange = nsString.paragraphRange(for: NSRange(location: charIndex, length: 0))
-        guard paragraphRange.length >= 1 else { return false }
+        let fullRange = NSRange(location: 0, length: nsString.length)
 
-        let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: 1))
-        guard lineStart == "☐" || lineStart == "☑" else { return false }
+        // Find all checkbox characters and add cursor rects
+        nsString.enumerateSubstrings(in: fullRange, options: .byParagraphs) { substring, paragraphRange, _, _ in
+            guard let line = substring, paragraphRange.length >= 1 else { return }
 
-        // Check if point is within checkbox glyph area
-        guard let layoutManager = layoutManager, let textContainer = textContainer else { return false }
+            if line.hasPrefix("☐") || line.hasPrefix("☑") {
+                let glyphRange = layoutManager.glyphRange(forCharacterRange: NSRange(location: paragraphRange.location, length: 1), actualCharacterRange: nil)
+                var checkboxRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
 
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: NSRange(location: paragraphRange.location, length: 1), actualCharacterRange: nil)
-        let checkboxRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
-        let hitArea = checkboxRect.insetBy(dx: -5, dy: -5)
+                // Adjust for text container inset
+                checkboxRect.origin.x += self.textContainerInset.width
+                checkboxRect.origin.y += self.textContainerInset.height
 
-        return hitArea.contains(point)
+                // Expand hit area slightly
+                checkboxRect = checkboxRect.insetBy(dx: -3, dy: -2)
+
+                self.addCursorRect(checkboxRect, cursor: .pointingHand)
+            }
+        }
+    }
+
+    // Refresh cursor rects when text changes
+    override func didChangeText() {
+        super.didChangeText()
+        window?.invalidateCursorRects(for: self)
     }
 
     // Handle Enter and Backspace for list continuation
