@@ -123,6 +123,11 @@ struct MainContentView: View {
 
         currentProject.terminalState.sendText(bracketedText)
 
+        // After a small delay, send Enter to submit to Claude
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            currentProject.terminalState.sendText("\r")
+        }
+
         // Update page status to shared
         appState.updatePageStatus(page.id, status: .shared, sharedAt: Date())
     }
