@@ -116,10 +116,26 @@ struct Page: Identifiable, Codable {
     var plainText: String {
         guard !content.isEmpty else { return "" }
 
-        // Try to extract just the text from RTF
+        // Try to extract text from RTF, checking for checkbox attachments
         var text = ""
         if let attrString = NSAttributedString(rtf: content, documentAttributes: nil) {
-            text = attrString.string
+            // Build plain text, converting checkbox attachments appropriately
+            let mutableText = NSMutableString()
+            let fullRange = NSRange(location: 0, length: attrString.length)
+
+            attrString.enumerateAttributes(in: fullRange, options: []) { attrs, range, _ in
+                let substring = attrString.attributedSubstring(from: range).string
+
+                // Check if this is a checkbox attachment (object replacement character)
+                if substring == "\u{FFFC}" {
+                    // Check if the line has strikethrough (indicates checked)
+                    let hasStrikethrough = (attrs[.strikethroughStyle] as? Int ?? 0) != 0
+                    mutableText.append(hasStrikethrough ? "[x]" : "[ ]")
+                } else {
+                    mutableText.append(substring)
+                }
+            }
+            text = mutableText as String
         } else if let rawText = String(data: content, encoding: .utf8) {
             // Fallback to raw UTF8 - but only if it doesn't look like RTF
             if !rawText.hasPrefix("{\\rtf") {
@@ -127,11 +143,9 @@ struct Page: Identifiable, Codable {
             }
         }
 
-        // Clean up for terminal - replace bullets, checkboxes, and tabs with plain text equivalents
+        // Clean up for terminal - replace bullets and tabs with plain text equivalents
         text = text.replacingOccurrences(of: "\u{2022}\t", with: "- ")
         text = text.replacingOccurrences(of: "•\t", with: "- ")
-        text = text.replacingOccurrences(of: "☐\t", with: "[ ] ")
-        text = text.replacingOccurrences(of: "☑\t", with: "[x] ")
         text = text.replacingOccurrences(of: "\t", with: "  ")
 
         // Collapse multiple spaces into one (but preserve newlines)
@@ -142,7 +156,7 @@ struct Page: Identifiable, Codable {
         // Remove any non-printable characters except newlines and spaces
         let allowedCharacters = CharacterSet.alphanumerics
             .union(.punctuationCharacters)
-            .union(CharacterSet(charactersIn: " \n"))
+            .union(CharacterSet(charactersIn: " \n[]"))
         text = String(text.unicodeScalars.filter { allowedCharacters.contains($0) })
 
         return text.trimmingCharacters(in: .whitespacesAndNewlines)

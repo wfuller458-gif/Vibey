@@ -9,6 +9,75 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Checkbox Text Attachment
+
+class CheckboxAttachment: NSTextAttachment {
+    var isChecked: Bool = false
+
+    static let size: CGFloat = 18
+    static let checkedColor = NSColor(red: 59/255, green: 130/255, blue: 246/255, alpha: 1.0) // Blue
+    static let uncheckedBorderColor = NSColor(red: 100/255, green: 100/255, blue: 100/255, alpha: 1.0)
+    static let checkmarkColor = NSColor.white
+
+    convenience init(checked: Bool) {
+        self.init()
+        self.isChecked = checked
+        self.image = Self.createImage(checked: checked)
+    }
+
+    static func createImage(checked: Bool) -> NSImage {
+        let size = NSSize(width: Self.size, height: Self.size)
+        let image = NSImage(size: size)
+
+        image.lockFocus()
+
+        let rect = NSRect(x: 1, y: 1, width: size.width - 2, height: size.height - 2)
+        let path = NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4)
+
+        if checked {
+            // Filled blue background
+            checkedColor.setFill()
+            path.fill()
+
+            // White checkmark
+            let checkPath = NSBezierPath()
+            checkPath.lineWidth = 2
+            checkPath.lineCapStyle = .round
+            checkPath.lineJoinStyle = .round
+
+            // Checkmark coordinates (scaled to our size)
+            let startX = size.width * 0.25
+            let midX = size.width * 0.45
+            let endX = size.width * 0.75
+            let startY = size.height * 0.5
+            let midY = size.height * 0.3
+            let endY = size.height * 0.7
+
+            checkPath.move(to: NSPoint(x: startX, y: startY))
+            checkPath.line(to: NSPoint(x: midX, y: midY))
+            checkPath.line(to: NSPoint(x: endX, y: endY))
+
+            checkmarkColor.setStroke()
+            checkPath.stroke()
+        } else {
+            // Empty with border
+            uncheckedBorderColor.setStroke()
+            path.lineWidth = 1.5
+            path.stroke()
+        }
+
+        image.unlockFocus()
+        return image
+    }
+
+    override func attachmentBounds(for textContainer: NSTextContainer?, proposedLineFragment lineFrag: NSRect, glyphPosition position: CGPoint, characterIndex charIndex: Int) -> NSRect {
+        // Center vertically with text
+        let height = lineFrag.height
+        let yOffset = (height - Self.size) / 2 - 2
+        return NSRect(x: 0, y: yOffset, width: Self.size, height: Self.size)
+    }
+}
+
 // MARK: - Selection State
 
 /// Tracks the current text selection formatting state
@@ -184,7 +253,15 @@ struct RichTextEditor: NSViewRepresentable {
                     let lineContent = nsString.substring(with: NSRange(location: paragraphRange.location, length: min(4, paragraphRange.length)))
                     state.hasBulletList = lineContent.hasPrefix("\u{2022}\t") || lineContent.hasPrefix("•\t")
                     state.hasNumberedList = lineContent.range(of: "^\\d+\\.\\t", options: .regularExpression) != nil
-                    state.hasCheckbox = lineContent.hasPrefix("☐\t") || lineContent.hasPrefix("☑\t")
+
+                    // Check for checkbox attachment at start of paragraph
+                    state.hasCheckbox = false
+                    if paragraphRange.location < textStorage.length {
+                        if let attachment = textStorage.attribute(.attachment, at: paragraphRange.location, effectiveRange: nil) as? CheckboxAttachment {
+                            state.hasCheckbox = true
+                            _ = attachment // Silence unused warning
+                        }
+                    }
                 }
             }
 
@@ -225,26 +302,22 @@ class RichNSTextView: NSTextView {
     override func resetCursorRects() {
         super.resetCursorRects()
 
-        // Add pointer cursor rects for all checkboxes
-        guard let layoutManager = layoutManager, let textContainer = textContainer else { return }
+        // Add pointer cursor rects for all checkbox attachments
+        guard let textStorage = textStorage,
+              let layoutManager = layoutManager,
+              let textContainer = textContainer else { return }
 
-        let nsString = string as NSString
-        let fullRange = NSRange(location: 0, length: nsString.length)
-
-        // Find all checkbox characters and add cursor rects
-        nsString.enumerateSubstrings(in: fullRange, options: .byParagraphs) { substring, paragraphRange, _, _ in
-            guard let line = substring, paragraphRange.length >= 1 else { return }
-
-            if line.hasPrefix("☐") || line.hasPrefix("☑") {
-                let glyphRange = layoutManager.glyphRange(forCharacterRange: NSRange(location: paragraphRange.location, length: 1), actualCharacterRange: nil)
+        textStorage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: textStorage.length), options: []) { value, range, _ in
+            if value is CheckboxAttachment {
+                let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
                 var checkboxRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
 
                 // Adjust for text container inset
                 checkboxRect.origin.x += self.textContainerInset.width
                 checkboxRect.origin.y += self.textContainerInset.height
 
-                // Expand hit area slightly
-                checkboxRect = checkboxRect.insetBy(dx: -3, dy: -2)
+                // Expand hit area
+                checkboxRect = checkboxRect.insetBy(dx: -2, dy: -2)
 
                 self.addCursorRect(checkboxRect, cursor: .pointingHand)
             }
@@ -255,6 +328,94 @@ class RichNSTextView: NSTextView {
     override func didChangeText() {
         super.didChangeText()
         window?.invalidateCursorRects(for: self)
+    }
+
+    // Handle mouse clicks for checkbox toggling
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+
+        if let (attachmentRange, attachment) = checkboxAttachmentAt(point) {
+            toggleCheckbox(attachment, at: attachmentRange)
+            return
+        }
+
+        super.mouseDown(with: event)
+    }
+
+    /// Find checkbox attachment at a point
+    private func checkboxAttachmentAt(_ point: NSPoint) -> (NSRange, CheckboxAttachment)? {
+        guard let textStorage = textStorage,
+              let layoutManager = layoutManager,
+              let textContainer = textContainer else { return nil }
+
+        // Adjust point for text container inset
+        let adjustedPoint = NSPoint(
+            x: point.x - textContainerInset.width,
+            y: point.y - textContainerInset.height
+        )
+
+        let charIndex = layoutManager.characterIndex(for: adjustedPoint, in: textContainer, fractionOfDistanceBetweenInsertionPoints: nil)
+        guard charIndex < textStorage.length else { return nil }
+
+        // Check if there's a checkbox attachment at this position
+        var effectiveRange = NSRange()
+        if let attachment = textStorage.attribute(.attachment, at: charIndex, effectiveRange: &effectiveRange) as? CheckboxAttachment {
+            // Verify click is within the attachment bounds
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: effectiveRange, actualCharacterRange: nil)
+            var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            rect = rect.insetBy(dx: -5, dy: -5)
+
+            if rect.contains(adjustedPoint) {
+                return (effectiveRange, attachment)
+            }
+        }
+
+        return nil
+    }
+
+    /// Toggle a checkbox attachment
+    private func toggleCheckbox(_ attachment: CheckboxAttachment, at range: NSRange) {
+        guard let textStorage = textStorage else { return }
+
+        let newChecked = !attachment.isChecked
+        let newAttachment = CheckboxAttachment(checked: newChecked)
+
+        // Get paragraph range for strikethrough
+        let nsString = string as NSString
+        let paragraphRange = nsString.paragraphRange(for: range)
+
+        textStorage.beginEditing()
+
+        // Replace attachment
+        let attachmentString = NSMutableAttributedString(attachment: newAttachment)
+        // Preserve font color for the attachment character
+        let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
+        attachmentString.addAttribute(.foregroundColor, value: textColor, range: NSRange(location: 0, length: 1))
+        textStorage.replaceCharacters(in: range, with: attachmentString)
+
+        // Apply or remove strikethrough to content after checkbox (skip attachment + space)
+        let contentStart = paragraphRange.location + 2  // attachment + space
+        var contentLength = paragraphRange.length - 2
+        if contentLength > 0 {
+            // Don't include trailing newline
+            let endIndex = contentStart + contentLength - 1
+            if endIndex < nsString.length && nsString.substring(with: NSRange(location: endIndex, length: 1)) == "\n" {
+                contentLength -= 1
+            }
+        }
+
+        if contentLength > 0 {
+            let contentRange = NSRange(location: contentStart, length: contentLength)
+            if newChecked {
+                textStorage.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: contentRange)
+            } else {
+                textStorage.removeAttribute(.strikethroughStyle, range: contentRange)
+            }
+        }
+
+        textStorage.endEditing()
+        didChangeText()
+        notifyTypingAttributesChanged()
     }
 
     // Handle Enter and Backspace for list continuation
@@ -294,14 +455,19 @@ class RichNSTextView: NSTextView {
         let lineContent = nsString.substring(with: paragraphRange)
         let hasBullet = lineContent.hasPrefix("\u{2022}\t") || lineContent.hasPrefix("•\t")
         let hasNumber = lineContent.range(of: "^\\d+\\.\\t", options: .regularExpression) != nil
-        let hasCheckbox = lineContent.hasPrefix("☐\t") || lineContent.hasPrefix("☑\t")
+
+        // Check for checkbox attachment
+        var hasCheckbox = false
+        if paragraphRange.location < textStorage.length {
+            hasCheckbox = textStorage.attribute(.attachment, at: paragraphRange.location, effectiveRange: nil) is CheckboxAttachment
+        }
 
         if !hasBullet && !hasNumber && !hasCheckbox {
             return false // Not a list line, use default behavior
         }
 
         // Check if line is empty (just the marker)
-        let markerLength = getListMarkerLength(lineContent)
+        let markerLength = getListMarkerLength(lineContent, hasCheckboxAttachment: hasCheckbox)
         let contentAfterMarker = String(lineContent.dropFirst(markerLength)).trimmingCharacters(in: .whitespacesAndNewlines)
 
         if contentAfterMarker.isEmpty {
@@ -318,30 +484,44 @@ class RichNSTextView: NSTextView {
         let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
         let markerFont = NSFont.systemFont(ofSize: 16)
 
-        // Insert newline and new marker
-        let newMarker: String
-        if hasBullet {
-            newMarker = "\n\u{2022}\t"
-        } else if hasCheckbox {
-            newMarker = "\n☐\t"  // Always insert unchecked checkbox
+        textStorage.beginEditing()
+
+        if hasCheckbox {
+            // Insert newline, then checkbox attachment, then space
+            let newlineAttr = NSAttributedString(string: "\n", attributes: [.font: markerFont, .foregroundColor: textColor])
+            textStorage.replaceCharacters(in: selectedRange(), with: newlineAttr)
+
+            let insertPos = cursorPos + 1
+            let checkboxAttachment = CheckboxAttachment(checked: false)
+            let attachmentString = NSMutableAttributedString(attachment: checkboxAttachment)
+            attachmentString.addAttribute(.foregroundColor, value: textColor, range: NSRange(location: 0, length: 1))
+            textStorage.insert(attachmentString, at: insertPos)
+
+            let spaceAttr = NSAttributedString(string: " ", attributes: [.font: markerFont, .foregroundColor: textColor])
+            textStorage.insert(spaceAttr, at: insertPos + 1)
+
+            textStorage.endEditing()
+            setSelectedRange(NSRange(location: insertPos + 2, length: 0))
         } else {
-            // Get current number and increment
-            let currentNumber = extractListNumber(from: lineContent)
-            newMarker = "\n\(currentNumber + 1).\t"
+            // Insert newline and text marker
+            let newMarker: String
+            if hasBullet {
+                newMarker = "\n\u{2022}\t"
+            } else {
+                let currentNumber = extractListNumber(from: lineContent)
+                newMarker = "\n\(currentNumber + 1).\t"
+            }
+
+            let markerAttrs: [NSAttributedString.Key: Any] = [
+                .font: markerFont,
+                .foregroundColor: textColor
+            ]
+            let attrMarker = NSAttributedString(string: newMarker, attributes: markerAttrs)
+            textStorage.replaceCharacters(in: selectedRange(), with: attrMarker)
+            textStorage.endEditing()
+            setSelectedRange(NSRange(location: cursorPos + newMarker.count, length: 0))
         }
 
-        let markerAttrs: [NSAttributedString.Key: Any] = [
-            .font: markerFont,
-            .foregroundColor: textColor
-        ]
-        let attrMarker = NSAttributedString(string: newMarker, attributes: markerAttrs)
-
-        textStorage.beginEditing()
-        textStorage.replaceCharacters(in: selectedRange(), with: attrMarker)
-        textStorage.endEditing()
-
-        // Move cursor after new marker
-        setSelectedRange(NSRange(location: cursorPos + newMarker.count, length: 0))
         didChangeText()
         notifyTypingAttributesChanged()
         return true
@@ -362,13 +542,18 @@ class RichNSTextView: NSTextView {
         let lineContent = nsString.substring(with: paragraphRange)
         let hasBullet = lineContent.hasPrefix("\u{2022}\t") || lineContent.hasPrefix("•\t")
         let hasNumber = lineContent.range(of: "^\\d+\\.\\t", options: .regularExpression) != nil
-        let hasCheckbox = lineContent.hasPrefix("☐\t") || lineContent.hasPrefix("☑\t")
+
+        // Check for checkbox attachment
+        var hasCheckbox = false
+        if paragraphRange.location < textStorage.length {
+            hasCheckbox = textStorage.attribute(.attachment, at: paragraphRange.location, effectiveRange: nil) is CheckboxAttachment
+        }
 
         if !hasBullet && !hasNumber && !hasCheckbox {
             return false // Not a list line
         }
 
-        let markerLength = getListMarkerLength(lineContent)
+        let markerLength = getListMarkerLength(lineContent, hasCheckboxAttachment: hasCheckbox)
 
         // Check if cursor is right after the marker (content is empty)
         let cursorPosInLine = cursorPos - paragraphRange.location
@@ -389,12 +574,12 @@ class RichNSTextView: NSTextView {
     }
 
     /// Get the length of a list marker (bullet, number, or checkbox)
-    private func getListMarkerLength(_ lineContent: String) -> Int {
+    private func getListMarkerLength(_ lineContent: String, hasCheckboxAttachment: Bool = false) -> Int {
         if lineContent.hasPrefix("\u{2022}\t") || lineContent.hasPrefix("•\t") {
             return 2 // bullet + tab
         }
-        if lineContent.hasPrefix("☐\t") || lineContent.hasPrefix("☑\t") {
-            return 2 // checkbox + tab
+        if hasCheckboxAttachment {
+            return 2 // attachment char + space
         }
         // Find tab position for numbered list
         if let tabIndex = lineContent.firstIndex(of: "\t") {
@@ -650,34 +835,38 @@ class RichNSTextView: NSTextView {
         let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
         let markerFont = NSFont.systemFont(ofSize: 16)
 
-        // Get marker string for type
-        func markerFor(_ listType: ListType) -> String {
-            switch listType {
-            case .bullet: return "\u{2022}\t"
-            case .numbered: return "1.\t"
-            case .checkbox: return "☐\t"
-            }
-        }
-
         // Check if we're on an empty line or at start of document
         let isEmpty = paragraphRange.length == 0 ||
             (paragraphRange.length == 1 && (string as NSString).substring(with: paragraphRange) == "\n")
 
         if isEmpty || textStorage.length == 0 {
-            // Empty line - just insert the marker directly
-            let marker = markerFor(type)
-            let markerAttrs: [NSAttributedString.Key: Any] = [
-                .font: markerFont,
-                .foregroundColor: textColor
-            ]
-            let attrMarker = NSAttributedString(string: marker, attributes: markerAttrs)
-
             textStorage.beginEditing()
-            textStorage.insert(attrMarker, at: selectedRange.location)
-            textStorage.endEditing()
 
-            // Move cursor after marker
-            setSelectedRange(NSRange(location: selectedRange.location + marker.count, length: 0))
+            if type == .checkbox {
+                // Insert checkbox attachment + space
+                let checkboxAttachment = CheckboxAttachment(checked: false)
+                let attachmentString = NSMutableAttributedString(attachment: checkboxAttachment)
+                attachmentString.addAttribute(.foregroundColor, value: textColor, range: NSRange(location: 0, length: 1))
+                textStorage.insert(attachmentString, at: selectedRange.location)
+
+                let spaceAttr = NSAttributedString(string: " ", attributes: [.font: markerFont, .foregroundColor: textColor])
+                textStorage.insert(spaceAttr, at: selectedRange.location + 1)
+
+                textStorage.endEditing()
+                setSelectedRange(NSRange(location: selectedRange.location + 2, length: 0))
+            } else {
+                // Insert text marker
+                let marker = type == .bullet ? "\u{2022}\t" : "1.\t"
+                let markerAttrs: [NSAttributedString.Key: Any] = [
+                    .font: markerFont,
+                    .foregroundColor: textColor
+                ]
+                let attrMarker = NSAttributedString(string: marker, attributes: markerAttrs)
+                textStorage.insert(attrMarker, at: selectedRange.location)
+                textStorage.endEditing()
+                setSelectedRange(NSRange(location: selectedRange.location + marker.count, length: 0))
+            }
+
             didChangeText()
             notifyTypingAttributesChanged()
             return
@@ -688,14 +877,22 @@ class RichNSTextView: NSTextView {
         let lineContent = nsString.substring(with: NSRange(location: paragraphRange.location, length: min(4, paragraphRange.length)))
         let hasBullet = lineContent.hasPrefix("\u{2022}\t") || lineContent.hasPrefix("•\t")
         let hasNumber = lineContent.range(of: "^\\d+\\.\\t", options: .regularExpression) != nil
-        let hasCheckbox = lineContent.hasPrefix("☐\t") || lineContent.hasPrefix("☑\t")
+
+        // Check for checkbox attachment
+        var hasCheckboxAttachment = false
+        var isChecked = false
+        if paragraphRange.location < textStorage.length {
+            if let attachment = textStorage.attribute(.attachment, at: paragraphRange.location, effectiveRange: nil) as? CheckboxAttachment {
+                hasCheckboxAttachment = true
+                isChecked = attachment.isChecked
+            }
+        }
 
         // Calculate marker length
         func getMarkerLen() -> Int {
             if hasBullet { return 2 }  // bullet + tab
-            if hasCheckbox { return 2 }  // checkbox + tab
+            if hasCheckboxAttachment { return 2 }  // attachment + space
             if hasNumber {
-                // Find where the tab is to determine marker length (e.g., "1.\t" = 3, "10.\t" = 4)
                 if let tabIndex = lineContent.firstIndex(of: "\t") {
                     return lineContent.distance(from: lineContent.startIndex, to: tabIndex) + 1
                 }
@@ -708,30 +905,29 @@ class RichNSTextView: NSTextView {
         // Check if toggling off (same type already applied)
         let isSameType = (type == .bullet && hasBullet) ||
                          (type == .numbered && hasNumber) ||
-                         (type == .checkbox && hasCheckbox)
+                         (type == .checkbox && hasCheckboxAttachment)
 
         if isSameType {
             // Toggle off - remove the marker
             let markerLength = getMarkerLen()
             if markerLength > 0 {
-                textStorage.deleteCharacters(in: NSRange(location: paragraphRange.location, length: markerLength))
-
                 // If it was a checked checkbox, also remove strikethrough from the line
-                if hasCheckbox && lineContent.hasPrefix("☑\t") {
-                    let contentStart = paragraphRange.location
+                if hasCheckboxAttachment && isChecked {
+                    let contentStart = paragraphRange.location + markerLength
                     let contentRange = NSRange(location: contentStart, length: paragraphRange.length - markerLength)
                     if contentRange.length > 0 {
                         textStorage.removeAttribute(.strikethroughStyle, range: contentRange)
                     }
                 }
+                textStorage.deleteCharacters(in: NSRange(location: paragraphRange.location, length: markerLength))
             }
         } else {
             // Remove existing marker if switching type
-            if hasBullet || hasNumber || hasCheckbox {
+            if hasBullet || hasNumber || hasCheckboxAttachment {
                 let markerLength = getMarkerLen()
                 if markerLength > 0 {
                     // If switching from checked checkbox, remove strikethrough
-                    if hasCheckbox && lineContent.hasPrefix("☑\t") {
+                    if hasCheckboxAttachment && isChecked {
                         let contentStart = paragraphRange.location + markerLength
                         let contentRange = NSRange(location: contentStart, length: paragraphRange.length - markerLength)
                         if contentRange.length > 0 {
@@ -743,76 +939,22 @@ class RichNSTextView: NSTextView {
             }
 
             // Insert new marker
-            let marker = markerFor(type)
-            let markerAttrs: [NSAttributedString.Key: Any] = [
-                .font: markerFont,
-                .foregroundColor: textColor
-            ]
-            let attrMarker = NSAttributedString(string: marker, attributes: markerAttrs)
-            textStorage.insert(attrMarker, at: paragraphRange.location)
-        }
+            if type == .checkbox {
+                let checkboxAttachment = CheckboxAttachment(checked: false)
+                let attachmentString = NSMutableAttributedString(attachment: checkboxAttachment)
+                attachmentString.addAttribute(.foregroundColor, value: textColor, range: NSRange(location: 0, length: 1))
+                textStorage.insert(attachmentString, at: paragraphRange.location)
 
-        textStorage.endEditing()
-        didChangeText()
-        notifyTypingAttributesChanged()
-    }
-
-    /// Toggle checkbox state when clicked
-    func toggleCheckboxAt(_ location: Int) {
-        guard let textStorage = textStorage else { return }
-
-        let nsString = string as NSString
-        let paragraphRange = nsString.paragraphRange(for: NSRange(location: location, length: 0))
-        guard paragraphRange.length >= 2 else { return }
-
-        let lineContent = nsString.substring(with: NSRange(location: paragraphRange.location, length: min(2, paragraphRange.length)))
-
-        // Text color for markers
-        let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
-        let markerFont = NSFont.systemFont(ofSize: 16)
-
-        textStorage.beginEditing()
-
-        if lineContent.hasPrefix("☐") {
-            // Check it - replace with checked box and add strikethrough
-            let markerAttrs: [NSAttributedString.Key: Any] = [
-                .font: markerFont,
-                .foregroundColor: textColor
-            ]
-            let checkedMarker = NSAttributedString(string: "☑", attributes: markerAttrs)
-            textStorage.replaceCharacters(in: NSRange(location: paragraphRange.location, length: 1), with: checkedMarker)
-
-            // Add strikethrough to rest of line (after marker + tab)
-            let contentStart = paragraphRange.location + 2
-            let contentLength = paragraphRange.length - 2
-            if contentLength > 0 {
-                // Remove trailing newline from strikethrough range
-                var strikeRange = NSRange(location: contentStart, length: contentLength)
-                if strikeRange.length > 0 {
-                    let lastChar = nsString.substring(with: NSRange(location: strikeRange.location + strikeRange.length - 1, length: 1))
-                    if lastChar == "\n" {
-                        strikeRange.length -= 1
-                    }
-                }
-                if strikeRange.length > 0 {
-                    textStorage.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: strikeRange)
-                }
-            }
-        } else if lineContent.hasPrefix("☑") {
-            // Uncheck it - replace with unchecked box and remove strikethrough
-            let markerAttrs: [NSAttributedString.Key: Any] = [
-                .font: markerFont,
-                .foregroundColor: textColor
-            ]
-            let uncheckedMarker = NSAttributedString(string: "☐", attributes: markerAttrs)
-            textStorage.replaceCharacters(in: NSRange(location: paragraphRange.location, length: 1), with: uncheckedMarker)
-
-            // Remove strikethrough from rest of line
-            let contentStart = paragraphRange.location + 2
-            let contentLength = paragraphRange.length - 2
-            if contentLength > 0 {
-                let contentRange = NSRange(location: contentStart, length: contentLength)
-                textStorage.removeAttribute(.strikethroughStyle, range: contentRange)
+                let spaceAttr = NSAttributedString(string: " ", attributes: [.font: markerFont, .foregroundColor: textColor])
+                textStorage.insert(spaceAttr, at: paragraphRange.location + 1)
+            } else {
+                let marker = type == .bullet ? "\u{2022}\t" : "1.\t"
+                let markerAttrs: [NSAttributedString.Key: Any] = [
+                    .font: markerFont,
+                    .foregroundColor: textColor
+                ]
+                let attrMarker = NSAttributedString(string: marker, attributes: markerAttrs)
+                textStorage.insert(attrMarker, at: paragraphRange.location)
             }
         }
 
@@ -821,39 +963,6 @@ class RichNSTextView: NSTextView {
         notifyTypingAttributesChanged()
     }
 
-    // Handle mouse clicks for checkbox toggling
-    override func mouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        let charIndex = characterIndexForInsertion(at: point)
-
-        // Check if click is on a checkbox
-        if charIndex < string.count {
-            let nsString = string as NSString
-            let paragraphRange = nsString.paragraphRange(for: NSRange(location: charIndex, length: 0))
-
-            if paragraphRange.length >= 2 {
-                let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: 1))
-
-                // Check if clicking on or near the checkbox character
-                if lineStart == "☐" || lineStart == "☑" {
-                    // Calculate if click is within the checkbox area (first ~20 pixels)
-                    if let layoutManager = layoutManager, let textContainer = textContainer {
-                        let glyphRange = layoutManager.glyphRange(forCharacterRange: NSRange(location: paragraphRange.location, length: 1), actualCharacterRange: nil)
-                        let checkboxRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
-
-                        // Expand hit area slightly for easier clicking
-                        let hitArea = checkboxRect.insetBy(dx: -5, dy: -5)
-                        if hitArea.contains(point) {
-                            toggleCheckboxAt(paragraphRange.location)
-                            return
-                        }
-                    }
-                }
-            }
-        }
-
-        super.mouseDown(with: event)
-    }
 }
 
 // MARK: - Preview
