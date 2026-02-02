@@ -165,20 +165,32 @@ struct RichTextEditor: NSViewRepresentable {
 
             // Get content from start of paragraph to cursor
             let startToCursor = cursorPos - paragraphRange.location
-            guard startToCursor >= 2 else { return }
 
-            let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: min(startToCursor, 4)))
-
-            // Check for "- " at start of line (bullet trigger)
-            if lineStart == "- " {
-                convertToBulletList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location)
-                return
+            // Check for "- " trigger (exactly 2 chars from line start)
+            if startToCursor == 2 {
+                let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: 2))
+                if lineStart == "- " {
+                    convertToBulletList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location)
+                    return
+                }
             }
 
-            // Check for "1. " at start of line (numbered list trigger)
-            if lineStart.hasPrefix("1. ") || (startToCursor >= 3 && lineStart.range(of: "^\\d+\\. $", options: .regularExpression) != nil) {
-                convertToNumberedList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location, lineStart: lineStart)
-                return
+            // Check for "1. " trigger (exactly 3 chars from line start)
+            if startToCursor == 3 {
+                let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: 3))
+                if lineStart.range(of: "^\\d\\. $", options: .regularExpression) != nil {
+                    convertToNumberedList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location, triggerLength: 3)
+                    return
+                }
+            }
+
+            // Check for "10. " or longer number triggers (4+ chars)
+            if startToCursor >= 4 && startToCursor <= 6 {
+                let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: startToCursor))
+                if lineStart.range(of: "^\\d+\\. $", options: .regularExpression) != nil {
+                    convertToNumberedList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location, triggerLength: startToCursor)
+                    return
+                }
             }
         }
 
@@ -202,16 +214,13 @@ struct RichTextEditor: NSViewRepresentable {
             textView.didChangeText()
         }
 
-        private func convertToNumberedList(textView: RichNSTextView, textStorage: NSTextStorage, paragraphStart: Int, lineStart: String) {
+        private func convertToNumberedList(textView: RichNSTextView, textStorage: NSTextStorage, paragraphStart: Int, triggerLength: Int) {
             let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
             let markerFont = NSFont.systemFont(ofSize: 16)
 
-            // Find where the number ends (e.g., "1. " -> delete 3 chars)
-            let deleteLength = lineStart.count
-
             textStorage.beginEditing()
             // Delete "1. " or similar
-            textStorage.deleteCharacters(in: NSRange(location: paragraphStart, length: deleteLength))
+            textStorage.deleteCharacters(in: NSRange(location: paragraphStart, length: triggerLength))
             // Insert numbered marker
             let markerAttrs: [NSAttributedString.Key: Any] = [
                 .font: markerFont,
