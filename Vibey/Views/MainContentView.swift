@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct MainContentView: View {
     @EnvironmentObject var appState: AppState
@@ -109,8 +110,10 @@ struct MainContentView: View {
             contextText += "# \(page.title)\n\n"
         }
 
-        if !page.content.isEmpty {
-            contextText += page.content
+        // Get plain text from rich text content
+        let plainContent = page.plainText
+        if !plainContent.isEmpty {
+            contextText += plainContent
         }
 
         // Send the text first
@@ -320,92 +323,102 @@ struct PageEditorPanel: View {
     @Binding var page: Page
     let onSendContext: (Page) -> Void
     @FocusState private var isTitleFocused: Bool
-    @FocusState private var isContentFocused: Bool
     @State private var currentTime = Date()
+    @State private var selectionState = TextSelectionState()
+    @State private var richTextView: RichNSTextView?
 
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Page title input
-            TextField("Page Name + Press Enter", text: $page.title, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.lexendBold(size: 32, comicSans: isComicSansMode))
-                .lineSpacing(11.2)
-                .foregroundColor(.vibeyText)
-                .opacity(page.title.isEmpty ? 0.4 : 1.0)
-                .lineLimit(1...5)
-                .focused($isTitleFocused)
-                .onSubmit {
-                    isTitleFocused = false
-                    isContentFocused = true
-                }
-
-            // Context status
-            HStack(spacing: 4) {
-                Image(statusImageName)
-                    .resizable()
-                    .frame(width: 24, height: 24)
-
-                Text(statusText)
-                    .font(.atkinsonRegular(size: 12, comicSans: isComicSansMode))
-                    .foregroundColor(statusTextColor)
-                    .kerning(0.84)
-            }
-            .onReceive(timer) { _ in
-                currentTime = Date()
-            }
-
-            // Send Page Context button
-            Button(action: {
-                onSendContext(page)
-            }) {
-                HStack(spacing: 10) {
-                    Text("Send Page Context")
-                        .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
-                        .foregroundColor(.white)
-                        .kerning(1.12)
-
-                    Image(systemName: "return")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(hex: "1C1E22"))
-                .cornerRadius(4)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.vibeyCardBorder, lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-            .opacity(page.title.isEmpty && page.content.isEmpty ? 0.4 : 1.0)
-
-            // Text editor
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $page.content)
-                    .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
-                    .lineSpacing(8)
+        VStack(alignment: .leading, spacing: 0) {
+            // Top section with title and status
+            VStack(alignment: .leading, spacing: 12) {
+                // Page title input
+                TextField("Page Name + Press Enter", text: $page.title, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.lexendBold(size: 32, comicSans: isComicSansMode))
+                    .lineSpacing(11.2)
                     .foregroundColor(.vibeyText)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.vibeyBackground)
-                    .focused($isContentFocused)
+                    .opacity(page.title.isEmpty ? 0.4 : 1.0)
+                    .lineLimit(1...5)
+                    .focused($isTitleFocused)
+                    .onSubmit {
+                        isTitleFocused = false
+                        // Focus the rich text editor
+                        DispatchQueue.main.async {
+                            richTextView?.window?.makeFirstResponder(richTextView)
+                        }
+                    }
 
-                if page.content.isEmpty && !isContentFocused {
-                    Text("Start typing")
-                        .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
-                        .foregroundColor(.vibeyText.opacity(0.4))
-                        .padding(.top, 8)
-                        .padding(.leading, 5)
-                        .allowsHitTesting(false)
+                // Context status
+                HStack(spacing: 4) {
+                    Image(statusImageName)
+                        .resizable()
+                        .frame(width: 24, height: 24)
+
+                    Text(statusText)
+                        .font(.atkinsonRegular(size: 12, comicSans: isComicSansMode))
+                        .foregroundColor(statusTextColor)
+                        .kerning(0.84)
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onReceive(timer) { _ in
+                    currentTime = Date()
+                }
 
-            Spacer()
+                // Send Page Context button
+                Button(action: {
+                    onSendContext(page)
+                }) {
+                    HStack(spacing: 10) {
+                        Text("Send Page Context")
+                            .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
+                            .foregroundColor(.white)
+                            .kerning(1.12)
+
+                        Image(systemName: "return")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(hex: "1C1E22"))
+                    .cornerRadius(4)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.vibeyCardBorder, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .opacity(page.title.isEmpty && page.isEmpty ? 0.4 : 1.0)
+            }
+            .padding(.horizontal, 32)
+            .padding(.top, 32)
+            .padding(.bottom, 16)
+
+            // Formatting toolbar
+            FormattingToolbar(
+                selectionState: $selectionState,
+                onBold: { applyBold() },
+                onItalic: { applyItalic() },
+                onUnderline: { applyUnderline() },
+                onStrikethrough: { applyStrikethrough() },
+                onHeading: { level in applyHeading(level) },
+                onTextColor: { color in applyTextColor(color) },
+                onBulletList: { applyBulletList() },
+                onNumberedList: { applyNumberedList() }
+            )
+
+            // Rich text editor
+            RichTextEditorWithRef(
+                content: $page.content,
+                selectionState: $selectionState,
+                textView: $richTextView,
+                isComicSansMode: isComicSansMode
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 32)
         }
-        .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.vibeyBackground)
         .onAppear {
@@ -416,6 +429,42 @@ struct PageEditorPanel: View {
             }
         }
     }
+
+    // MARK: - Formatting Actions
+
+    private func applyBold() {
+        richTextView?.applyBold()
+    }
+
+    private func applyItalic() {
+        richTextView?.applyItalic()
+    }
+
+    private func applyUnderline() {
+        richTextView?.applyUnderline()
+    }
+
+    private func applyStrikethrough() {
+        richTextView?.applyStrikethrough()
+    }
+
+    private func applyHeading(_ level: Int) {
+        richTextView?.applyHeading(level)
+    }
+
+    private func applyTextColor(_ color: NSColor) {
+        richTextView?.applyTextColor(color)
+    }
+
+    private func applyBulletList() {
+        richTextView?.applyBulletList()
+    }
+
+    private func applyNumberedList() {
+        richTextView?.applyNumberedList()
+    }
+
+    // MARK: - Status Properties
 
     private var statusImageName: String {
         switch page.status {
@@ -464,6 +513,213 @@ struct PageEditorPanel: View {
         } else {
             let hours = seconds / 3600
             return "\(hours)h ago"
+        }
+    }
+}
+
+// MARK: - Rich Text Editor with Reference
+
+/// Wrapper to expose the NSTextView reference for formatting commands
+struct RichTextEditorWithRef: NSViewRepresentable {
+    @Binding var content: Data
+    @Binding var selectionState: TextSelectionState
+    @Binding var textView: RichNSTextView?
+    var isComicSansMode: Bool = false
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+
+        let textView = RichNSTextView()
+        textView.delegate = context.coordinator
+        textView.isRichText = true
+        textView.allowsUndo = true
+        textView.usesFontPanel = false
+        textView.usesRuler = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+
+        // Enable spell checking and grammar
+        textView.isContinuousSpellCheckingEnabled = true
+        textView.isGrammarCheckingEnabled = true
+        textView.isAutomaticSpellingCorrectionEnabled = false
+
+        // Appearance
+        textView.backgroundColor = NSColor(red: 18/255, green: 20/255, blue: 24/255, alpha: 1.0) // vibeyBackground
+        textView.insertionPointColor = NSColor.white
+        textView.textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0) // vibeyText
+
+        // Text container setup
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+
+        // Default paragraph style for line spacing
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = 8
+        textView.defaultParagraphStyle = paragraphStyle
+
+        // Set default typing attributes - use system font (San Francisco) for body text
+        let defaultFont = isComicSansMode
+            ? NSFont(name: "Comic Sans MS", size: 16) ?? NSFont.systemFont(ofSize: 16)
+            : NSFont.systemFont(ofSize: 16)
+
+        textView.typingAttributes = [
+            .font: defaultFont,
+            .foregroundColor: NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0),
+            .paragraphStyle: paragraphStyle
+        ]
+
+        scrollView.documentView = textView
+        context.coordinator.textView = textView
+
+        // Store reference
+        DispatchQueue.main.async {
+            self.textView = textView
+        }
+
+        // Load initial content
+        loadContent(into: textView)
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? RichNSTextView else { return }
+
+        // Update reference if needed
+        if self.textView !== textView {
+            DispatchQueue.main.async {
+                self.textView = textView
+            }
+        }
+
+        // Update content only if it changed externally
+        if context.coordinator.isUpdating { return }
+
+        let currentRTF = textView.textStorage?.rtf(from: NSRange(location: 0, length: textView.textStorage?.length ?? 0), documentAttributes: [:])
+        if currentRTF != content {
+            loadContent(into: textView)
+        }
+    }
+
+    private func loadContent(into textView: NSTextView) {
+        if content.isEmpty {
+            textView.string = ""
+            return
+        }
+
+        if let attrString = NSAttributedString(rtf: content, documentAttributes: nil) {
+            textView.textStorage?.setAttributedString(attrString)
+        } else if let plainText = String(data: content, encoding: .utf8) {
+            // Use system font (San Francisco) for body text
+            let font = isComicSansMode
+                ? NSFont(name: "Comic Sans MS", size: 16) ?? NSFont.systemFont(ofSize: 16)
+                : NSFont.systemFont(ofSize: 16)
+
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
+            ]
+            let attrString = NSAttributedString(string: plainText, attributes: attributes)
+            textView.textStorage?.setAttributedString(attrString)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: RichTextEditorWithRef
+        weak var textView: RichNSTextView?
+        var isUpdating = false
+
+        init(_ parent: RichTextEditorWithRef) {
+            self.parent = parent
+            super.init()
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView,
+                  let textStorage = textView.textStorage else { return }
+
+            isUpdating = true
+            if let rtfData = textStorage.rtf(from: NSRange(location: 0, length: textStorage.length), documentAttributes: [:]) {
+                parent.content = rtfData
+            }
+            isUpdating = false
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            updateSelectionState(textView)
+        }
+
+        func updateSelectionState(_ textView: NSTextView) {
+            let selectedRange = textView.selectedRange()
+            var state = TextSelectionState()
+
+            if selectedRange.length > 0 {
+                // Text is selected - show attributes of selection
+                guard let textStorage = textView.textStorage,
+                      selectedRange.location < textStorage.length else {
+                    parent.selectionState = state
+                    return
+                }
+                let attrs = textStorage.attributes(at: selectedRange.location, effectiveRange: nil)
+                state = extractState(from: attrs)
+            } else {
+                // No selection (cursor only) - use typing attributes
+                // This shows what the NEXT typed character will look like
+                let attrs = textView.typingAttributes
+                state = extractState(from: attrs)
+            }
+
+            // Check if current line has bullet or number
+            if let textStorage = textView.textStorage, textStorage.length > 0 {
+                let nsString = textView.string as NSString
+                let paragraphRange = nsString.paragraphRange(for: selectedRange)
+                if paragraphRange.length > 0 {
+                    let lineContent = nsString.substring(with: NSRange(location: paragraphRange.location, length: min(4, paragraphRange.length)))
+                    state.hasBulletList = lineContent.hasPrefix("\u{2022}\t") || lineContent.hasPrefix("•\t")
+                    state.hasNumberedList = lineContent.range(of: "^\\d+\\.\\t", options: .regularExpression) != nil
+                }
+            }
+
+            parent.selectionState = state
+        }
+
+        private func extractState(from attrs: [NSAttributedString.Key: Any]) -> TextSelectionState {
+            var state = TextSelectionState()
+
+            if let font = attrs[.font] as? NSFont {
+                state.fontSize = font.pointSize
+                let traits = font.fontDescriptor.symbolicTraits
+                state.isBold = traits.contains(.bold)
+                state.isItalic = traits.contains(.italic)
+            }
+
+            if let underlineStyle = attrs[.underlineStyle] as? Int {
+                state.isUnderline = underlineStyle != 0
+            }
+
+            if let strikethroughStyle = attrs[.strikethroughStyle] as? Int {
+                state.isStrikethrough = strikethroughStyle != 0
+            }
+
+            if let color = attrs[.foregroundColor] as? NSColor {
+                state.textColor = color
+            }
+
+            return state
         }
     }
 }
