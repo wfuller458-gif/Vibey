@@ -221,6 +221,57 @@ struct RichTextEditor: NSViewRepresentable {
 // MARK: - Custom NSTextView
 
 class RichNSTextView: NSTextView {
+    private var trackingArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+
+        if let existing = trackingArea {
+            removeTrackingArea(existing)
+        }
+
+        trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea!)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+
+        if isPointOverCheckbox(point) {
+            NSCursor.pointingHand.set()
+        } else {
+            NSCursor.iBeam.set()
+        }
+
+        super.mouseMoved(with: event)
+    }
+
+    private func isPointOverCheckbox(_ point: NSPoint) -> Bool {
+        let charIndex = characterIndexForInsertion(at: point)
+        guard charIndex < string.count else { return false }
+
+        let nsString = string as NSString
+        let paragraphRange = nsString.paragraphRange(for: NSRange(location: charIndex, length: 0))
+        guard paragraphRange.length >= 1 else { return false }
+
+        let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: 1))
+        guard lineStart == "☐" || lineStart == "☑" else { return false }
+
+        // Check if point is within checkbox glyph area
+        guard let layoutManager = layoutManager, let textContainer = textContainer else { return false }
+
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: NSRange(location: paragraphRange.location, length: 1), actualCharacterRange: nil)
+        let checkboxRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+        let hitArea = checkboxRect.insetBy(dx: -5, dy: -5)
+
+        return hitArea.contains(point)
+    }
+
     // Handle Enter and Backspace for list continuation
     override func keyDown(with event: NSEvent) {
         let keyCode = event.keyCode
