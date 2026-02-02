@@ -112,9 +112,38 @@ struct Page: Identifiable, Codable {
         }
     }
 
-    /// Get plain text for sending to terminal
+    /// Get plain text for sending to terminal - strips ALL formatting but preserves line breaks
     var plainText: String {
-        return attributedString.string
+        guard !content.isEmpty else { return "" }
+
+        // Try to extract just the text from RTF
+        var text = ""
+        if let attrString = NSAttributedString(rtf: content, documentAttributes: nil) {
+            text = attrString.string
+        } else if let rawText = String(data: content, encoding: .utf8) {
+            // Fallback to raw UTF8 - but only if it doesn't look like RTF
+            if !rawText.hasPrefix("{\\rtf") {
+                text = rawText
+            }
+        }
+
+        // Clean up for terminal - replace bullets and tabs with plain text equivalents
+        text = text.replacingOccurrences(of: "\u{2022}\t", with: "- ")
+        text = text.replacingOccurrences(of: "•\t", with: "- ")
+        text = text.replacingOccurrences(of: "\t", with: "  ")
+
+        // Collapse multiple spaces into one (but preserve newlines)
+        while text.contains("  ") {
+            text = text.replacingOccurrences(of: "  ", with: " ")
+        }
+
+        // Remove any non-printable characters except newlines and spaces
+        let allowedCharacters = CharacterSet.alphanumerics
+            .union(.punctuationCharacters)
+            .union(CharacterSet(charactersIn: " \n"))
+        text = String(text.unicodeScalars.filter { allowedCharacters.contains($0) })
+
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Check if content is empty

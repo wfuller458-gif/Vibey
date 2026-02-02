@@ -103,26 +103,25 @@ struct MainContentView: View {
     private func sendPageContext(_ page: Page) {
         guard let currentProject = appState.currentProject else { return }
 
-        // Build the page context text
+        // Build the page context with line breaks preserved
         var contextText = ""
 
         if !page.title.isEmpty {
             contextText += "# \(page.title)\n\n"
         }
 
-        // Get plain text from rich text content
+        // Get plain text from rich text content (preserves line breaks)
         let plainContent = page.plainText
         if !plainContent.isEmpty {
             contextText += plainContent
         }
 
-        // Send the text first
-        currentProject.terminalState.sendText(contextText)
+        // Use bracketed paste mode to prevent line-by-line execution
+        // This tells the terminal "this is pasted text, don't execute each line"
+        // ESC[200~ = start bracketed paste, ESC[201~ = end bracketed paste
+        let bracketedText = "\u{1b}[200~\(contextText)\u{1b}[201~"
 
-        // Then after a small delay, send Enter to submit
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            currentProject.terminalState.sendText("\r")
-        }
+        currentProject.terminalState.sendText(bracketedText)
 
         // Update page status to shared
         appState.updatePageStatus(page.id, status: .shared, sharedAt: Date())
