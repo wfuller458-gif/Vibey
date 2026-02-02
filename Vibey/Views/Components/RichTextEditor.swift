@@ -142,14 +142,87 @@ struct RichTextEditor: NSViewRepresentable {
         }
 
         func textDidChange(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView,
+            guard let textView = notification.object as? RichNSTextView,
                   let textStorage = textView.textStorage else { return }
+
+            // Check for auto-list triggers ("- " or "1. " at start of line)
+            checkAutoListTrigger(textView: textView, textStorage: textStorage)
 
             isUpdating = true
             if let rtfData = textStorage.rtf(from: NSRange(location: 0, length: textStorage.length), documentAttributes: [:]) {
                 parent.content = rtfData
             }
             isUpdating = false
+        }
+
+        /// Check if user typed "- " or "1. " at start of line and convert to list
+        private func checkAutoListTrigger(textView: RichNSTextView, textStorage: NSTextStorage) {
+            let cursorPos = textView.selectedRange().location
+            guard cursorPos >= 2 else { return }
+
+            let nsString = textView.string as NSString
+            let paragraphRange = nsString.paragraphRange(for: NSRange(location: cursorPos, length: 0))
+
+            // Get content from start of paragraph to cursor
+            let startToCursor = cursorPos - paragraphRange.location
+            guard startToCursor >= 2 else { return }
+
+            let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: min(startToCursor, 4)))
+
+            // Check for "- " at start of line (bullet trigger)
+            if lineStart == "- " {
+                convertToBulletList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location)
+                return
+            }
+
+            // Check for "1. " at start of line (numbered list trigger)
+            if lineStart.hasPrefix("1. ") || (startToCursor >= 3 && lineStart.range(of: "^\\d+\\. $", options: .regularExpression) != nil) {
+                convertToNumberedList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location, lineStart: lineStart)
+                return
+            }
+        }
+
+        private func convertToBulletList(textView: RichNSTextView, textStorage: NSTextStorage, paragraphStart: Int) {
+            let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
+            let markerFont = NSFont.systemFont(ofSize: 16)
+
+            textStorage.beginEditing()
+            // Delete "- "
+            textStorage.deleteCharacters(in: NSRange(location: paragraphStart, length: 2))
+            // Insert bullet marker
+            let markerAttrs: [NSAttributedString.Key: Any] = [
+                .font: markerFont,
+                .foregroundColor: textColor
+            ]
+            let bullet = NSAttributedString(string: "\u{2022}\t", attributes: markerAttrs)
+            textStorage.insert(bullet, at: paragraphStart)
+            textStorage.endEditing()
+
+            textView.setSelectedRange(NSRange(location: paragraphStart + 2, length: 0))
+            textView.didChangeText()
+        }
+
+        private func convertToNumberedList(textView: RichNSTextView, textStorage: NSTextStorage, paragraphStart: Int, lineStart: String) {
+            let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
+            let markerFont = NSFont.systemFont(ofSize: 16)
+
+            // Find where the number ends (e.g., "1. " -> delete 3 chars)
+            let deleteLength = lineStart.count
+
+            textStorage.beginEditing()
+            // Delete "1. " or similar
+            textStorage.deleteCharacters(in: NSRange(location: paragraphStart, length: deleteLength))
+            // Insert numbered marker
+            let markerAttrs: [NSAttributedString.Key: Any] = [
+                .font: markerFont,
+                .foregroundColor: textColor
+            ]
+            let number = NSAttributedString(string: "1.\t", attributes: markerAttrs)
+            textStorage.insert(number, at: paragraphStart)
+            textStorage.endEditing()
+
+            textView.setSelectedRange(NSRange(location: paragraphStart + 3, length: 0))
+            textView.didChangeText()
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -608,24 +681,27 @@ class RichNSTextView: NSTextView {
         guard let textStorage = textStorage else { return }
 
         let selectedRange = selectedRange()
-        let paragraphRange = (string as NSString).paragraphRange(for: selectedRange)
+        let nsString = string as NSString
+
+        // Get the full range covering all paragraphs in selection
+        let fullParagraphRange = nsString.paragraphRange(for: selectedRange)
 
         // Text color for markers (vibeyText)
         let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
         let markerFont = NSFont.systemFont(ofSize: 16)
 
         // Get marker string for type
-        func markerFor(_ listType: ListType) -> String {
+        func markerFor(_ listType: ListType, number: Int = 1) -> String {
             switch listType {
             case .bullet: return "\u{2022}\t"
-            case .numbered: return "1.\t"
+            case .numbered: return "\(number).\t"
             case .checkbox: return "☐\t"
             }
         }
 
         // Check if we're on an empty line or at start of document
-        let isEmpty = paragraphRange.length == 0 ||
-            (paragraphRange.length == 1 && (string as NSString).substring(with: paragraphRange) == "\n")
+        let isEmpty = fullParagraphRange.length == 0 ||
+            (fullParagraphRange.length == 1 && nsString.substring(with: fullParagraphRange) == "\n")
 
         if isEmpty || textStorage.length == 0 {
             // Empty line - just insert the marker directly
@@ -647,73 +723,88 @@ class RichNSTextView: NSTextView {
             return
         }
 
-        // Check if already has bullet/number/checkbox at start of paragraph
-        let nsString = string as NSString
-        let lineContent = nsString.substring(with: NSRange(location: paragraphRange.location, length: min(4, paragraphRange.length)))
-        let hasBullet = lineContent.hasPrefix("\u{2022}\t") || lineContent.hasPrefix("•\t")
-        let hasNumber = lineContent.range(of: "^\\d+\\.\\t", options: .regularExpression) != nil
-        let hasCheckbox = lineContent.hasPrefix("☐\t") || lineContent.hasPrefix("☑\t")
+        // Collect all paragraph ranges within the selection
+        var paragraphRanges: [NSRange] = []
+        var currentLocation = fullParagraphRange.location
+        while currentLocation < fullParagraphRange.location + fullParagraphRange.length {
+            let paraRange = nsString.paragraphRange(for: NSRange(location: currentLocation, length: 0))
+            paragraphRanges.append(paraRange)
+            currentLocation = paraRange.location + paraRange.length
+            if currentLocation <= paraRange.location {
+                break // Safety check to prevent infinite loop
+            }
+        }
 
-        // Calculate marker length
-        func getMarkerLen() -> Int {
-            if hasBullet { return 2 }  // bullet + tab
-            if hasCheckbox { return 2 }  // checkbox + tab
-            if hasNumber {
-                // Find where the tab is to determine marker length (e.g., "1.\t" = 3, "10.\t" = 4)
+        // Helper to check existing markers
+        func checkLineMarkers(_ lineContent: String) -> (hasBullet: Bool, hasNumber: Bool, hasCheckbox: Bool, markerLen: Int) {
+            let hasBullet = lineContent.hasPrefix("\u{2022}\t") || lineContent.hasPrefix("•\t")
+            let hasNumber = lineContent.range(of: "^\\d+\\.\\t", options: .regularExpression) != nil
+            let hasCheckbox = lineContent.hasPrefix("☐\t") || lineContent.hasPrefix("☑\t")
+
+            var markerLen = 0
+            if hasBullet { markerLen = 2 }
+            else if hasCheckbox { markerLen = 2 }
+            else if hasNumber {
                 if let tabIndex = lineContent.firstIndex(of: "\t") {
-                    return lineContent.distance(from: lineContent.startIndex, to: tabIndex) + 1
+                    markerLen = lineContent.distance(from: lineContent.startIndex, to: tabIndex) + 1
                 }
             }
-            return 0
+            return (hasBullet, hasNumber, hasCheckbox, markerLen)
         }
 
         textStorage.beginEditing()
 
-        // Check if toggling off (same type already applied)
-        let isSameType = (type == .bullet && hasBullet) ||
-                         (type == .numbered && hasNumber) ||
-                         (type == .checkbox && hasCheckbox)
+        // Process paragraphs in reverse order to maintain correct positions
+        var listNumber = paragraphRanges.count
+        for paraRange in paragraphRanges.reversed() {
+            let lineContent = nsString.substring(with: NSRange(location: paraRange.location, length: min(6, paraRange.length)))
+            let (hasBullet, hasNumber, hasCheckbox, markerLen) = checkLineMarkers(lineContent)
 
-        if isSameType {
-            // Toggle off - remove the marker
-            let markerLength = getMarkerLen()
-            if markerLength > 0 {
-                textStorage.deleteCharacters(in: NSRange(location: paragraphRange.location, length: markerLength))
+            // Check if toggling off (same type already applied)
+            let isSameType = (type == .bullet && hasBullet) ||
+                             (type == .numbered && hasNumber) ||
+                             (type == .checkbox && hasCheckbox)
 
-                // If it was a checked checkbox, also remove strikethrough from the line
-                if hasCheckbox && lineContent.hasPrefix("☑\t") {
-                    let contentStart = paragraphRange.location
-                    let contentRange = NSRange(location: contentStart, length: paragraphRange.length - markerLength)
-                    if contentRange.length > 0 {
-                        textStorage.removeAttribute(.strikethroughStyle, range: contentRange)
-                    }
-                }
-            }
-        } else {
-            // Remove existing marker if switching type
-            if hasBullet || hasNumber || hasCheckbox {
-                let markerLength = getMarkerLen()
-                if markerLength > 0 {
-                    // If switching from checked checkbox, remove strikethrough
+            if isSameType {
+                // Toggle off - remove the marker
+                if markerLen > 0 {
+                    // If it was a checked checkbox, also remove strikethrough
                     if hasCheckbox && lineContent.hasPrefix("☑\t") {
-                        let contentStart = paragraphRange.location + markerLength
-                        let contentRange = NSRange(location: contentStart, length: paragraphRange.length - markerLength)
+                        let contentStart = paraRange.location + markerLen
+                        let contentRange = NSRange(location: contentStart, length: paraRange.length - markerLen)
                         if contentRange.length > 0 {
                             textStorage.removeAttribute(.strikethroughStyle, range: contentRange)
                         }
                     }
-                    textStorage.deleteCharacters(in: NSRange(location: paragraphRange.location, length: markerLength))
+                    textStorage.deleteCharacters(in: NSRange(location: paraRange.location, length: markerLen))
                 }
+            } else {
+                // Remove existing marker if switching type
+                if hasBullet || hasNumber || hasCheckbox {
+                    if markerLen > 0 {
+                        // If switching from checked checkbox, remove strikethrough
+                        if hasCheckbox && lineContent.hasPrefix("☑\t") {
+                            let contentStart = paraRange.location + markerLen
+                            let contentRange = NSRange(location: contentStart, length: paraRange.length - markerLen)
+                            if contentRange.length > 0 {
+                                textStorage.removeAttribute(.strikethroughStyle, range: contentRange)
+                            }
+                        }
+                        textStorage.deleteCharacters(in: NSRange(location: paraRange.location, length: markerLen))
+                    }
+                }
+
+                // Insert new marker (use correct number for numbered lists)
+                let marker = markerFor(type, number: listNumber)
+                let markerAttrs: [NSAttributedString.Key: Any] = [
+                    .font: markerFont,
+                    .foregroundColor: textColor
+                ]
+                let attrMarker = NSAttributedString(string: marker, attributes: markerAttrs)
+                textStorage.insert(attrMarker, at: paraRange.location)
             }
 
-            // Insert new marker
-            let marker = markerFor(type)
-            let markerAttrs: [NSAttributedString.Key: Any] = [
-                .font: markerFont,
-                .foregroundColor: textColor
-            ]
-            let attrMarker = NSAttributedString(string: marker, attributes: markerAttrs)
-            textStorage.insert(attrMarker, at: paragraphRange.location)
+            listNumber -= 1
         }
 
         textStorage.endEditing()
