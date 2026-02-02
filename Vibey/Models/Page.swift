@@ -127,9 +127,11 @@ struct Page: Identifiable, Codable {
             }
         }
 
-        // Clean up for terminal - replace bullets and tabs with plain text equivalents
+        // Clean up for terminal - replace bullets, checkboxes, and tabs with plain text equivalents
         text = text.replacingOccurrences(of: "\u{2022}\t", with: "- ")
         text = text.replacingOccurrences(of: "•\t", with: "- ")
+        text = text.replacingOccurrences(of: "☐\t", with: "[ ] ")
+        text = text.replacingOccurrences(of: "☑\t", with: "[x] ")
         text = text.replacingOccurrences(of: "\t", with: "  ")
 
         // Collapse multiple spaces into one (but preserve newlines)

@@ -409,7 +409,8 @@ struct PageEditorPanel: View {
                 onHeading: { level in applyHeading(level) },
                 onTextColor: { color in applyTextColor(color) },
                 onBulletList: { applyBulletList() },
-                onNumberedList: { applyNumberedList() }
+                onNumberedList: { applyNumberedList() },
+                onCheckboxList: { applyCheckboxList() }
             )
 
             // Rich text editor
@@ -466,6 +467,10 @@ struct PageEditorPanel: View {
 
     private func applyNumberedList() {
         richTextView?.applyNumberedList()
+    }
+
+    private func applyCheckboxList() {
+        richTextView?.applyCheckboxList()
     }
 
     // MARK: - Status Properties

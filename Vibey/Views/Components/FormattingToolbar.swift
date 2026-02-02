@@ -19,6 +19,7 @@ struct FormattingToolbar: View {
     var onTextColor: (NSColor) -> Void
     var onBulletList: () -> Void
     var onNumberedList: () -> Void
+    var onCheckboxList: () -> Void
 
     @State private var showingColorPicker = false
 
@@ -107,6 +108,11 @@ struct FormattingToolbar: View {
             // Numbered list
             FormatButton(systemImage: "list.number", isActive: selectionState.hasNumberedList) {
                 onNumberedList()
+            }
+
+            // Checkbox list
+            FormatButton(systemImage: "checklist", isActive: selectionState.hasCheckbox) {
+                onCheckboxList()
             }
 
             Spacer()
@@ -229,7 +235,8 @@ struct FormattingToolbar_Previews: PreviewProvider {
                     onHeading: { _ in },
                     onTextColor: { color in state.textColor = color },
                     onBulletList: { state.hasBulletList.toggle() },
-                    onNumberedList: { state.hasNumberedList.toggle() }
+                    onNumberedList: { state.hasNumberedList.toggle() },
+                    onCheckboxList: { state.hasCheckbox.toggle() }
                 )
 
                 Spacer()
