@@ -295,6 +295,8 @@ struct RichTextEditor: NSViewRepresentable {
 class RichNSTextView: NSTextView {
     // Track hovered line for showing menu icon
     var hoveredLineRange: NSRange? = nil
+    // Track if mouse is directly over the icon button
+    var isIconHovered: Bool = false
 
     // Left margin for hover menu icon (matches the SwiftUI padding being moved inside)
     static let hoverIconMargin: CGFloat = 32
@@ -336,16 +338,18 @@ class RichNSTextView: NSTextView {
         let buttonY = lineRect.origin.y + (lineRect.height - buttonSize) / 2
         let buttonRect = NSRect(x: buttonX, y: buttonY, width: buttonSize, height: buttonSize)
 
-        // Draw rounded rectangle background
-        let backgroundColor = NSColor(red: 45/255, green: 48/255, blue: 54/255, alpha: 1.0)
-        let backgroundPath = NSBezierPath(roundedRect: buttonRect, xRadius: 6, yRadius: 6)
-        backgroundColor.setFill()
-        backgroundPath.fill()
+        // Only draw rounded rectangle background when icon is directly hovered
+        if isIconHovered {
+            let backgroundColor = NSColor(red: 45/255, green: 48/255, blue: 54/255, alpha: 1.0)
+            let backgroundPath = NSBezierPath(roundedRect: buttonRect, xRadius: 6, yRadius: 6)
+            backgroundColor.setFill()
+            backgroundPath.fill()
+        }
 
-        // Draw vertical dots icon (⋮) centered in the button
+        // Always draw vertical dots icon (⋮) when line is hovered
         let iconString = "⋮"
-        let iconFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        let iconColor = NSColor(red: 160/255, green: 163/255, blue: 170/255, alpha: 1.0)
+        let iconFont = NSFont.systemFont(ofSize: 16, weight: .heavy)
+        let iconColor = NSColor(red: 180/255, green: 183/255, blue: 190/255, alpha: 1.0)
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: iconFont,
@@ -357,6 +361,32 @@ class RichNSTextView: NSTextView {
         let iconY = buttonY + (buttonSize - iconSize.height) / 2
 
         iconString.draw(at: NSPoint(x: iconX, y: iconY), withAttributes: attributes)
+    }
+
+    // Helper to get the current icon button rect for hit testing
+    private func getIconButtonRect() -> NSRect? {
+        guard let hoveredRange = hoveredLineRange,
+              let layoutManager = layoutManager,
+              let textStorage = textStorage,
+              textStorage.length > 0,
+              hoveredRange.location < textStorage.length else {
+            return nil
+        }
+
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
+        guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
+            return nil
+        }
+
+        let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+        guard lineRect.height > 0 else {
+            return nil
+        }
+
+        let buttonSize: CGFloat = 24
+        let buttonX = (RichNSTextView.hoverIconMargin - buttonSize) / 2
+        let buttonY = lineRect.origin.y + (lineRect.height - buttonSize) / 2
+        return NSRect(x: buttonX, y: buttonY, width: buttonSize, height: buttonSize)
     }
 
     // MARK: - Tracking Area Setup
@@ -389,17 +419,13 @@ class RichNSTextView: NSTextView {
               let textContainer = textContainer,
               let textStorage = textStorage,
               textStorage.length > 0 else {
-            if hoveredLineRange != nil {
+            if hoveredLineRange != nil || isIconHovered {
                 hoveredLineRange = nil
+                isIconHovered = false
                 setNeedsDisplay(bounds)
             }
             return
         }
-
-        // Adjust point to be within text container coordinate space
-        var textPoint = point
-        textPoint.x -= RichNSTextView.hoverIconMargin
-        textPoint.x = max(0, textPoint.x)
 
         // Get character index at mouse position
         let charIndex = characterIndexForInsertion(at: point)
@@ -409,9 +435,28 @@ class RichNSTextView: NSTextView {
         let nsString = string as NSString
         let paragraphRange = nsString.paragraphRange(for: NSRange(location: safeIndex, length: 0))
 
-        // Only update if the hovered line changed
+        var needsRedraw = false
+
+        // Update hovered line
         if hoveredLineRange != paragraphRange {
             hoveredLineRange = paragraphRange
+            needsRedraw = true
+        }
+
+        // Check if mouse is over the icon button
+        let newIconHovered: Bool
+        if let iconRect = getIconButtonRect() {
+            newIconHovered = iconRect.contains(point)
+        } else {
+            newIconHovered = false
+        }
+
+        if isIconHovered != newIconHovered {
+            isIconHovered = newIconHovered
+            needsRedraw = true
+        }
+
+        if needsRedraw {
             setNeedsDisplay(bounds)
         }
     }
@@ -419,8 +464,9 @@ class RichNSTextView: NSTextView {
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
 
-        if hoveredLineRange != nil {
+        if hoveredLineRange != nil || isIconHovered {
             hoveredLineRange = nil
+            isIconHovered = false
             setNeedsDisplay(bounds)
         }
     }
