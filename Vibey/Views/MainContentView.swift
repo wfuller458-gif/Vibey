@@ -330,6 +330,7 @@ struct PageEditorPanel: View {
     @State private var currentTime = Date()
     @State private var selectionState = TextSelectionState()
     @State private var richTextView: RichNSTextView?
+    @State private var isDictating = false
 
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -402,6 +403,7 @@ struct PageEditorPanel: View {
             // Formatting toolbar
             FormattingToolbar(
                 selectionState: $selectionState,
+                isDictating: isDictating,
                 onBold: { applyBold() },
                 onItalic: { applyItalic() },
                 onUnderline: { applyUnderline() },
@@ -410,7 +412,8 @@ struct PageEditorPanel: View {
                 onTextColor: { color in applyTextColor(color) },
                 onBulletList: { applyBulletList() },
                 onNumberedList: { applyNumberedList() },
-                onCheckboxList: { applyCheckboxList() }
+                onCheckboxList: { applyCheckboxList() },
+                onDictation: { applyDictation() }
             )
 
             // Rich text editor
@@ -471,6 +474,16 @@ struct PageEditorPanel: View {
 
     private func applyCheckboxList() {
         richTextView?.applyCheckboxList()
+    }
+
+    private func applyDictation() {
+        // Set up callback if not already set
+        if richTextView?.onDictationStateChanged == nil {
+            richTextView?.onDictationStateChanged = { [self] dictating in
+                isDictating = dictating
+            }
+        }
+        richTextView?.toggleSystemDictation()
     }
 
     // MARK: - Status Properties
@@ -657,14 +670,86 @@ struct RichTextEditorWithRef: NSViewRepresentable {
         }
 
         func textDidChange(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView,
+            guard let textView = notification.object as? RichNSTextView,
                   let textStorage = textView.textStorage else { return }
+
+            // Check for auto-list triggers ("- " or "1. " at start of line)
+            checkAutoListTrigger(textView: textView, textStorage: textStorage)
 
             isUpdating = true
             if let rtfData = textStorage.rtf(from: NSRange(location: 0, length: textStorage.length), documentAttributes: [:]) {
                 parent.content = rtfData
             }
             isUpdating = false
+        }
+
+        /// Check if user typed "- " or "1. " at start of line and convert to list
+        private func checkAutoListTrigger(textView: RichNSTextView, textStorage: NSTextStorage) {
+            let cursorPos = textView.selectedRange().location
+            guard cursorPos >= 2 else { return }
+
+            let nsString = textView.string as NSString
+            let paragraphRange = nsString.paragraphRange(for: NSRange(location: cursorPos, length: 0))
+
+            // Get content from start of paragraph to cursor
+            let startToCursor = cursorPos - paragraphRange.location
+
+            // Check for "- " trigger (exactly 2 chars from line start)
+            if startToCursor == 2 {
+                let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: 2))
+                if lineStart == "- " {
+                    convertToBulletList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location)
+                    return
+                }
+            }
+
+            // Check for "1. " trigger (exactly 3 chars from line start)
+            if startToCursor == 3 {
+                let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: 3))
+                if lineStart.range(of: "^\\d\\. $", options: .regularExpression) != nil {
+                    convertToNumberedList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location, triggerLength: 3)
+                    return
+                }
+            }
+
+            // Check for "10. " or longer number triggers (4+ chars)
+            if startToCursor >= 4 && startToCursor <= 6 {
+                let lineStart = nsString.substring(with: NSRange(location: paragraphRange.location, length: startToCursor))
+                if lineStart.range(of: "^\\d+\\. $", options: .regularExpression) != nil {
+                    convertToNumberedList(textView: textView, textStorage: textStorage, paragraphStart: paragraphRange.location, triggerLength: startToCursor)
+                    return
+                }
+            }
+        }
+
+        private func convertToBulletList(textView: RichNSTextView, textStorage: NSTextStorage, paragraphStart: Int) {
+            // Delete "- " trigger text
+            textStorage.beginEditing()
+            textStorage.deleteCharacters(in: NSRange(location: paragraphStart, length: 2))
+            textStorage.endEditing()
+
+            // Position cursor at paragraph start
+            textView.setSelectedRange(NSRange(location: paragraphStart, length: 0))
+
+            // Defer applyBulletList to avoid re-entrancy issues with textDidChange
+            DispatchQueue.main.async {
+                textView.applyBulletList()
+            }
+        }
+
+        private func convertToNumberedList(textView: RichNSTextView, textStorage: NSTextStorage, paragraphStart: Int, triggerLength: Int) {
+            // Delete "1. " or similar trigger text
+            textStorage.beginEditing()
+            textStorage.deleteCharacters(in: NSRange(location: paragraphStart, length: triggerLength))
+            textStorage.endEditing()
+
+            // Position cursor at paragraph start
+            textView.setSelectedRange(NSRange(location: paragraphStart, length: 0))
+
+            // Defer applyNumberedList to avoid re-entrancy issues with textDidChange
+            DispatchQueue.main.async {
+                textView.applyNumberedList()
+            }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

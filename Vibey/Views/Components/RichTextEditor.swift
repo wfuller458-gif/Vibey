@@ -875,6 +875,64 @@ class RichNSTextView: NSTextView {
         notifyTypingAttributesChanged()
     }
 
+    /// Track if dictation is currently active
+    var isDictating: Bool = false
+
+    /// Callback when dictation state changes
+    var onDictationStateChanged: ((Bool) -> Void)?
+
+    /// Start the built-in macOS dictation
+    @objc func startSystemDictation() {
+        // Make sure this text view is first responder
+        window?.makeFirstResponder(self)
+        // Trigger system dictation using the Edit menu action
+        let dictationSelector = NSSelectorFromString("startDictation:")
+        NSApp.sendAction(dictationSelector, to: nil, from: self)
+        isDictating = true
+        onDictationStateChanged?(true)
+    }
+
+    /// Stop the built-in macOS dictation
+    @objc func stopSystemDictation() {
+        // Post Escape key event to the system to dismiss dictation
+        let escapeKeyCode: UInt16 = 53
+
+        // Key down
+        if let escapeDown = CGEvent(keyboardEventSource: nil, virtualKey: escapeKeyCode, keyDown: true) {
+            escapeDown.post(tap: .cghidEventTap)
+        }
+        // Key up
+        if let escapeUp = CGEvent(keyboardEventSource: nil, virtualKey: escapeKeyCode, keyDown: false) {
+            escapeUp.post(tap: .cghidEventTap)
+        }
+
+        isDictating = false
+        onDictationStateChanged?(false)
+    }
+
+    /// Toggle dictation on/off
+    func toggleSystemDictation() {
+        if isDictating {
+            stopSystemDictation()
+        } else {
+            startSystemDictation()
+        }
+    }
+
+    // Override to detect when dictation ends naturally
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        super.insertText(string, replacementRange: replacementRange)
+        // If we were dictating and text was inserted, dictation may have ended
+        // We'll rely on the explicit stop for now
+    }
+
+    // Detect when dictation completes
+    override func didChangeText() {
+        super.didChangeText()
+        // Check if dictation panel is still visible - if not, update state
+        // This is a heuristic since there's no direct API
+    }
+
     // Handle mouse clicks for checkbox toggling
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)

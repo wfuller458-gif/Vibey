@@ -8,5 +8,9 @@
 	<!-- Network access (needed for RevenueCat) -->
 	<key>com.apple.security.network.client</key>
 	<true/>
+
+	<!-- Audio input access (needed for voice dictation) -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
 </dict>
 </plist>

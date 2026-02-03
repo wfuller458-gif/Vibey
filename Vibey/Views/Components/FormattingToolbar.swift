@@ -11,6 +11,7 @@ import AppKit
 
 struct FormattingToolbar: View {
     @Binding var selectionState: TextSelectionState
+    var isDictating: Bool = false
     var onBold: () -> Void
     var onItalic: () -> Void
     var onUnderline: () -> Void
@@ -20,6 +21,7 @@ struct FormattingToolbar: View {
     var onBulletList: () -> Void
     var onNumberedList: () -> Void
     var onCheckboxList: () -> Void
+    var onDictation: (() -> Void)? = nil
 
     @State private var showingColorPicker = false
 
@@ -113,6 +115,18 @@ struct FormattingToolbar: View {
             // Checkbox list
             FormatButton(systemImage: "checklist", isActive: selectionState.hasCheckbox) {
                 onCheckboxList()
+            }
+
+            // Dictation button
+            if let onDictation = onDictation {
+                Divider()
+                    .frame(height: 20)
+                    .padding(.horizontal, 4)
+
+                FormatButton(systemImage: isDictating ? "mic.fill" : "mic", isActive: isDictating) {
+                    onDictation()
+                }
+                .help(isDictating ? "Stop dictation" : "Start dictation")
             }
 
             Spacer()
@@ -223,11 +237,13 @@ struct FormattingToolbar_Previews: PreviewProvider {
 
     struct PreviewWrapper: View {
         @State private var state = TextSelectionState()
+        @State private var isDictating = false
 
         var body: some View {
             VStack {
                 FormattingToolbar(
                     selectionState: $state,
+                    isDictating: isDictating,
                     onBold: { state.isBold.toggle() },
                     onItalic: { state.isItalic.toggle() },
                     onUnderline: { state.isUnderline.toggle() },
@@ -236,7 +252,8 @@ struct FormattingToolbar_Previews: PreviewProvider {
                     onTextColor: { color in state.textColor = color },
                     onBulletList: { state.hasBulletList.toggle() },
                     onNumberedList: { state.hasNumberedList.toggle() },
-                    onCheckboxList: { state.hasCheckbox.toggle() }
+                    onCheckboxList: { state.hasCheckbox.toggle() },
+                    onDictation: { isDictating.toggle() }
                 )
 
                 Spacer()
