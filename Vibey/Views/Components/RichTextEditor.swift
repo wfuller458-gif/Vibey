@@ -66,6 +66,9 @@ struct RichTextEditor: NSViewRepresentable {
         textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = true
 
+        // Add left inset to reserve space for hover menu icon
+        textView.textContainerInset = NSSize(width: 36, height: 0)
+
         // Default paragraph style for line spacing
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineSpacing = 8
@@ -293,6 +296,118 @@ struct RichTextEditor: NSViewRepresentable {
 // MARK: - Custom NSTextView
 
 class RichNSTextView: NSTextView {
+    // Track hovered line for showing menu icon
+    var hoveredLineRange: NSRange? = nil
+
+    // MARK: - Tracking Area Setup
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+
+        // Remove existing tracking areas
+        for trackingArea in trackingAreas {
+            removeTrackingArea(trackingArea)
+        }
+
+        // Add new tracking area for mouse movement
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+
+        let point = convert(event.locationInWindow, from: nil)
+
+        // Check if we have layout manager and text container
+        guard let layoutManager = layoutManager,
+              let textContainer = textContainer,
+              textStorage?.length ?? 0 > 0 else {
+            if hoveredLineRange != nil {
+                hoveredLineRange = nil
+                needsDisplay = true
+            }
+            return
+        }
+
+        // Get character index at mouse position
+        let charIndex = characterIndexForInsertion(at: point)
+
+        // Get paragraph range for this character position
+        let nsString = string as NSString
+        let paragraphRange = nsString.paragraphRange(for: NSRange(location: min(charIndex, nsString.length), length: 0))
+
+        // Only update if the hovered line changed
+        if hoveredLineRange != paragraphRange {
+            hoveredLineRange = paragraphRange
+            needsDisplay = true
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+
+        if hoveredLineRange != nil {
+            hoveredLineRange = nil
+            needsDisplay = true
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        // Draw hover menu icon if a line is hovered
+        guard let hoveredRange = hoveredLineRange,
+              let layoutManager = layoutManager,
+              let textContainer = textContainer else {
+            return
+        }
+
+        // Get the glyph range for the hovered paragraph
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
+
+        // Get the line fragment rect for the first glyph in the paragraph
+        var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+
+        // Convert from text container coordinates to view coordinates
+        let containerOrigin = textContainerOrigin
+        lineRect.origin.x += containerOrigin.x
+        lineRect.origin.y += containerOrigin.y
+
+        // Button dimensions
+        let buttonSize: CGFloat = 24
+        let buttonX = (containerOrigin.x - buttonSize) / 2
+        let buttonY = lineRect.origin.y + (lineRect.height - buttonSize) / 2
+        let buttonRect = NSRect(x: buttonX, y: buttonY, width: buttonSize, height: buttonSize)
+
+        // Draw rounded rectangle background
+        let backgroundColor = NSColor(red: 45/255, green: 48/255, blue: 54/255, alpha: 1.0)
+        let backgroundPath = NSBezierPath(roundedRect: buttonRect, xRadius: 6, yRadius: 6)
+        backgroundColor.setFill()
+        backgroundPath.fill()
+
+        // Draw vertical dots icon (⋮) centered in the button
+        let iconString = "⋮"
+        let iconFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        let iconColor = NSColor(red: 160/255, green: 163/255, blue: 170/255, alpha: 1.0)
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: iconFont,
+            .foregroundColor: iconColor
+        ]
+
+        let iconSize = iconString.size(withAttributes: attributes)
+        let iconX = buttonX + (buttonSize - iconSize.width) / 2
+        let iconY = buttonY + (buttonSize - iconSize.height) / 2
+
+        iconString.draw(at: NSPoint(x: iconX, y: iconY), withAttributes: attributes)
+    }
+
     // Handle Enter and Backspace for list continuation
     override func keyDown(with event: NSEvent) {
         let keyCode = event.keyCode
