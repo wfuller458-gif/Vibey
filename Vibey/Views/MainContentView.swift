@@ -424,7 +424,7 @@ struct PageEditorPanel: View {
                 isComicSansMode: isComicSansMode
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 32)
+            .padding(.trailing, 32)
             .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -554,8 +554,10 @@ struct RichTextEditorWithRef: NSViewRepresentable {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
+        scrollView.contentView.postsBoundsChangedNotifications = true
 
         let textView = RichNSTextView()
+        textView.wantsLayer = true
         textView.delegate = context.coordinator
         textView.isRichText = true
         textView.allowsUndo = true

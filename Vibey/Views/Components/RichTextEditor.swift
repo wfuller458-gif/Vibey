@@ -66,9 +66,6 @@ struct RichTextEditor: NSViewRepresentable {
         textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = true
 
-        // Add left inset to reserve space for hover menu icon
-        textView.textContainerInset = NSSize(width: 36, height: 0)
-
         // Default paragraph style for line spacing
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineSpacing = 8
@@ -299,6 +296,69 @@ class RichNSTextView: NSTextView {
     // Track hovered line for showing menu icon
     var hoveredLineRange: NSRange? = nil
 
+    // Left margin for hover menu icon (matches the SwiftUI padding being moved inside)
+    static let hoverIconMargin: CGFloat = 32
+
+    // Override to add left-only margin for the hover icon area
+    // This shifts text right without using textContainerInset (which affects both sides)
+    override var textContainerOrigin: NSPoint {
+        return NSPoint(x: RichNSTextView.hoverIconMargin, y: 0)
+    }
+
+    // Draw background - this gets called reliably for drawing in the margin
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+
+        // Only draw hover icon if a line is hovered
+        guard let hoveredRange = hoveredLineRange,
+              let layoutManager = layoutManager,
+              let textStorage = textStorage,
+              textStorage.length > 0,
+              hoveredRange.location < textStorage.length else {
+            return
+        }
+
+        // Get the glyph range for the hovered paragraph
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
+        guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
+            return
+        }
+
+        // Get the line fragment rect for the first glyph in the paragraph
+        let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+        guard lineRect.height > 0 else {
+            return
+        }
+
+        // Button dimensions
+        let buttonSize: CGFloat = 24
+        let buttonX = (RichNSTextView.hoverIconMargin - buttonSize) / 2
+        let buttonY = lineRect.origin.y + (lineRect.height - buttonSize) / 2
+        let buttonRect = NSRect(x: buttonX, y: buttonY, width: buttonSize, height: buttonSize)
+
+        // Draw rounded rectangle background
+        let backgroundColor = NSColor(red: 45/255, green: 48/255, blue: 54/255, alpha: 1.0)
+        let backgroundPath = NSBezierPath(roundedRect: buttonRect, xRadius: 6, yRadius: 6)
+        backgroundColor.setFill()
+        backgroundPath.fill()
+
+        // Draw vertical dots icon (⋮) centered in the button
+        let iconString = "⋮"
+        let iconFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
+        let iconColor = NSColor(red: 160/255, green: 163/255, blue: 170/255, alpha: 1.0)
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: iconFont,
+            .foregroundColor: iconColor
+        ]
+
+        let iconSize = iconString.size(withAttributes: attributes)
+        let iconX = buttonX + (buttonSize - iconSize.width) / 2
+        let iconY = buttonY + (buttonSize - iconSize.height) / 2
+
+        iconString.draw(at: NSPoint(x: iconX, y: iconY), withAttributes: attributes)
+    }
+
     // MARK: - Tracking Area Setup
 
     override func updateTrackingAreas() {
@@ -327,25 +387,32 @@ class RichNSTextView: NSTextView {
         // Check if we have layout manager and text container
         guard let layoutManager = layoutManager,
               let textContainer = textContainer,
-              textStorage?.length ?? 0 > 0 else {
+              let textStorage = textStorage,
+              textStorage.length > 0 else {
             if hoveredLineRange != nil {
                 hoveredLineRange = nil
-                needsDisplay = true
+                setNeedsDisplay(bounds)
             }
             return
         }
 
+        // Adjust point to be within text container coordinate space
+        var textPoint = point
+        textPoint.x -= RichNSTextView.hoverIconMargin
+        textPoint.x = max(0, textPoint.x)
+
         // Get character index at mouse position
         let charIndex = characterIndexForInsertion(at: point)
+        let safeIndex = min(charIndex, textStorage.length > 0 ? textStorage.length - 1 : 0)
 
         // Get paragraph range for this character position
         let nsString = string as NSString
-        let paragraphRange = nsString.paragraphRange(for: NSRange(location: min(charIndex, nsString.length), length: 0))
+        let paragraphRange = nsString.paragraphRange(for: NSRange(location: safeIndex, length: 0))
 
         // Only update if the hovered line changed
         if hoveredLineRange != paragraphRange {
             hoveredLineRange = paragraphRange
-            needsDisplay = true
+            setNeedsDisplay(bounds)
         }
     }
 
@@ -354,59 +421,10 @@ class RichNSTextView: NSTextView {
 
         if hoveredLineRange != nil {
             hoveredLineRange = nil
-            needsDisplay = true
+            setNeedsDisplay(bounds)
         }
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        // Draw hover menu icon if a line is hovered
-        guard let hoveredRange = hoveredLineRange,
-              let layoutManager = layoutManager,
-              let textContainer = textContainer else {
-            return
-        }
-
-        // Get the glyph range for the hovered paragraph
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
-
-        // Get the line fragment rect for the first glyph in the paragraph
-        var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
-
-        // Convert from text container coordinates to view coordinates
-        let containerOrigin = textContainerOrigin
-        lineRect.origin.x += containerOrigin.x
-        lineRect.origin.y += containerOrigin.y
-
-        // Button dimensions
-        let buttonSize: CGFloat = 24
-        let buttonX = (containerOrigin.x - buttonSize) / 2
-        let buttonY = lineRect.origin.y + (lineRect.height - buttonSize) / 2
-        let buttonRect = NSRect(x: buttonX, y: buttonY, width: buttonSize, height: buttonSize)
-
-        // Draw rounded rectangle background
-        let backgroundColor = NSColor(red: 45/255, green: 48/255, blue: 54/255, alpha: 1.0)
-        let backgroundPath = NSBezierPath(roundedRect: buttonRect, xRadius: 6, yRadius: 6)
-        backgroundColor.setFill()
-        backgroundPath.fill()
-
-        // Draw vertical dots icon (⋮) centered in the button
-        let iconString = "⋮"
-        let iconFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        let iconColor = NSColor(red: 160/255, green: 163/255, blue: 170/255, alpha: 1.0)
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: iconFont,
-            .foregroundColor: iconColor
-        ]
-
-        let iconSize = iconString.size(withAttributes: attributes)
-        let iconX = buttonX + (buttonSize - iconSize.width) / 2
-        let iconY = buttonY + (buttonSize - iconSize.height) / 2
-
-        iconString.draw(at: NSPoint(x: iconX, y: iconY), withAttributes: attributes)
-    }
 
     // Handle Enter and Backspace for list continuation
     override func keyDown(with event: NSEvent) {
