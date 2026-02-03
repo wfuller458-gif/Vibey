@@ -12,6 +12,7 @@ import AppKit
 struct FormattingToolbar: View {
     @Binding var selectionState: TextSelectionState
     var isDictating: Bool = false
+    var isFloating: Bool = false  // Whether to display as floating popup
     var onBold: () -> Void
     var onItalic: () -> Void
     var onUnderline: () -> Void
@@ -129,15 +130,27 @@ struct FormattingToolbar: View {
                 .help(isDictating ? "Stop dictation" : "Start dictation")
             }
 
-            Spacer()
+            if !isFloating {
+                Spacer()
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color(hex: "1C1E22"))
+        .cornerRadius(isFloating ? 8 : 0)
+        .shadow(color: isFloating ? Color.black.opacity(0.4) : Color.clear, radius: 8, x: 0, y: 4)
         .overlay(
-            Rectangle()
-                .fill(Color.vibeyCardBorder)
-                .frame(height: 1),
+            Group {
+                if isFloating {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.vibeyCardBorder, lineWidth: 1)
+                } else {
+                    Rectangle()
+                        .fill(Color.vibeyCardBorder)
+                        .frame(height: 1)
+                        .frame(maxWidth: .infinity, alignment: .bottom)
+                }
+            },
             alignment: .bottom
         )
     }

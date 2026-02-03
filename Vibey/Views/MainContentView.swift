@@ -332,102 +332,182 @@ struct PageEditorPanel: View {
     @State private var richTextView: RichNSTextView?
     @State private var isDictating = false
 
+    // Floating toolbar state
+    @State private var showFloatingToolbar: Bool = false
+    @State private var toolbarPosition: CGPoint = .zero
+    @State private var toolbarOpenedViaIcon: Bool = false  // Track if opened via three-dots icon
+
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Top section with title and status
-            VStack(alignment: .leading, spacing: 12) {
-                // Page title input
-                TextField("Page Name + Press Enter", text: $page.title, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.lexendBold(size: 32, comicSans: isComicSansMode))
-                    .lineSpacing(11.2)
-                    .foregroundColor(.vibeyText)
-                    .opacity(page.title.isEmpty ? 0.4 : 1.0)
-                    .lineLimit(1...5)
-                    .focused($isTitleFocused)
-                    .onSubmit {
-                        isTitleFocused = false
-                        // Focus the rich text editor
-                        DispatchQueue.main.async {
-                            richTextView?.window?.makeFirstResponder(richTextView)
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Top section with title and status
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Page title input
+                        TextField("Page Name + Press Enter", text: $page.title, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.lexendBold(size: 32, comicSans: isComicSansMode))
+                            .lineSpacing(11.2)
+                            .foregroundColor(.vibeyText)
+                            .opacity(page.title.isEmpty ? 0.4 : 1.0)
+                            .lineLimit(1...5)
+                            .focused($isTitleFocused)
+                            .onSubmit {
+                                isTitleFocused = false
+                                // Focus the rich text editor
+                                DispatchQueue.main.async {
+                                    richTextView?.window?.makeFirstResponder(richTextView)
+                                }
+                            }
+
+                        // Context status
+                        HStack(spacing: 4) {
+                            Image(statusImageName)
+                                .resizable()
+                                .frame(width: 24, height: 24)
+
+                            Text(statusText)
+                                .font(.atkinsonRegular(size: 12, comicSans: isComicSansMode))
+                                .foregroundColor(statusTextColor)
+                                .kerning(0.84)
                         }
+                        .onReceive(timer) { _ in
+                            currentTime = Date()
+                        }
+
+                        // Send Page Context button
+                        Button(action: {
+                            onSendContext(page)
+                        }) {
+                            HStack(spacing: 10) {
+                                Text("Send Page Context")
+                                    .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
+                                    .foregroundColor(.white)
+                                    .kerning(1.12)
+
+                                Image(systemName: "return")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color(hex: "1C1E22"))
+                            .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.vibeyCardBorder, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(page.title.isEmpty && page.isEmpty ? 0.4 : 1.0)
                     }
+                    .padding(.horizontal, 32)
+                    .padding(.top, 32)
+                    .padding(.bottom, 16)
 
-                // Context status
-                HStack(spacing: 4) {
-                    Image(statusImageName)
-                        .resizable()
-                        .frame(width: 24, height: 24)
+                    // Rich text editor (toolbar is now floating)
+                    RichTextEditorWithRef(
+                        content: $page.content,
+                        selectionState: $selectionState,
+                        textView: $richTextView,
+                        isComicSansMode: isComicSansMode,
+                        onSelectionChanged: { hasSelection, selectionRect in
+                            print("DEBUG: onSelectionChanged called - hasSelection: \(hasSelection), rect: \(String(describing: selectionRect))")
+                            if hasSelection, let rect = selectionRect {
+                                // Position toolbar above the selection
+                                // Window coordinates have origin at bottom-left, SwiftUI at top-left
+                                // rect is in window coordinates - we need to flip Y
+                                let toolbarHeight: CGFloat = 44
+                                let toolbarWidth: CGFloat = 400 // Approximate width
 
-                    Text(statusText)
-                        .font(.atkinsonRegular(size: 12, comicSans: isComicSansMode))
-                        .foregroundColor(statusTextColor)
-                        .kerning(0.84)
-                }
-                .onReceive(timer) { _ in
-                    currentTime = Date()
-                }
+                                // Get window height for coordinate conversion
+                                let windowHeight = NSApp.keyWindow?.frame.height ?? geometry.size.height
+                                print("DEBUG: windowHeight: \(windowHeight), geometry.size: \(geometry.size)")
 
-                // Send Page Context button
-                Button(action: {
-                    onSendContext(page)
-                }) {
-                    HStack(spacing: 10) {
-                        Text("Send Page Context")
-                            .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
-                            .foregroundColor(.white)
-                            .kerning(1.12)
+                                // Convert Y coordinate (flip from bottom-origin to top-origin)
+                                // rect.maxY in window coords = top of selection
+                                // In SwiftUI, we want to position above that
+                                let flippedY = windowHeight - rect.maxY
 
-                        Image(systemName: "return")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color(hex: "1C1E22"))
-                    .cornerRadius(4)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(Color.vibeyCardBorder, lineWidth: 1)
+                                // Position toolbar above the selection (subtract toolbar height and gap)
+                                let localX = max(16, min(rect.midX - toolbarWidth / 2, geometry.size.width - toolbarWidth - 16))
+                                let localY = max(16, flippedY - toolbarHeight - 8)
+
+                                // Use fixed position for debugging - center of view
+                                toolbarPosition = CGPoint(x: geometry.size.width / 2, y: 200)
+                                print("DEBUG: toolbarPosition (fixed): \(toolbarPosition)")
+                                toolbarOpenedViaIcon = false  // Reset icon state when showing via selection
+                                showFloatingToolbar = true
+                            } else if !toolbarOpenedViaIcon {
+                                // Only hide if not opened via icon (icon-opened toolbar persists until explicit dismiss)
+                                showFloatingToolbar = false
+                            }
+                        },
+                        onMoreIconClicked: { lineRect in
+                            print("DEBUG: onMoreIconClicked called - lineRect: \(lineRect)")
+                            // Toggle toolbar - if showing, hide; if hidden, show near the line
+                            if showFloatingToolbar && toolbarOpenedViaIcon {
+                                // If already showing via icon click, toggle it off
+                                showFloatingToolbar = false
+                                toolbarOpenedViaIcon = false
+                            } else {
+                                let toolbarHeight: CGFloat = 44
+                                let toolbarWidth: CGFloat = 400
+
+                                // Get window height for coordinate conversion
+                                let windowHeight = NSApp.keyWindow?.frame.height ?? geometry.size.height
+                                print("DEBUG: windowHeight: \(windowHeight), geometry.size: \(geometry.size)")
+
+                                // Convert Y coordinate (flip from bottom-origin to top-origin)
+                                let flippedY = windowHeight - lineRect.maxY
+
+                                let localX = max(16, min(lineRect.minX, geometry.size.width - toolbarWidth - 16))
+                                let localY = max(16, flippedY - toolbarHeight - 8)
+
+                                // Use fixed position for debugging
+                                toolbarPosition = CGPoint(x: geometry.size.width / 2, y: 200)
+                                print("DEBUG: toolbarPosition (fixed): \(toolbarPosition)")
+                                toolbarOpenedViaIcon = true  // Mark as opened via icon
+                                showFloatingToolbar = true
+                            }
+                        },
+                        onEscapePressed: {
+                            showFloatingToolbar = false
+                            toolbarOpenedViaIcon = false
+                        }
                     )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.trailing, 32)
+                    .padding(.bottom, 32)
                 }
-                .buttonStyle(.plain)
-                .opacity(page.title.isEmpty && page.isEmpty ? 0.4 : 1.0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Floating toolbar overlay
+                if showFloatingToolbar {
+                    FormattingToolbar(
+                        selectionState: $selectionState,
+                        isDictating: isDictating,
+                        isFloating: true,
+                        onBold: { applyBold() },
+                        onItalic: { applyItalic() },
+                        onUnderline: { applyUnderline() },
+                        onStrikethrough: { applyStrikethrough() },
+                        onHeading: { level in applyHeading(level) },
+                        onTextColor: { color in applyTextColor(color) },
+                        onBulletList: { applyBulletList() },
+                        onNumberedList: { applyNumberedList() },
+                        onCheckboxList: { applyCheckboxList() },
+                        onDictation: { applyDictation() }
+                    )
+                    .fixedSize()
+                    .position(toolbarPosition)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    .animation(.easeOut(duration: 0.15), value: showFloatingToolbar)
+                }
             }
-            .padding(.horizontal, 32)
-            .padding(.top, 32)
-            .padding(.bottom, 16)
-
-            // Formatting toolbar
-            FormattingToolbar(
-                selectionState: $selectionState,
-                isDictating: isDictating,
-                onBold: { applyBold() },
-                onItalic: { applyItalic() },
-                onUnderline: { applyUnderline() },
-                onStrikethrough: { applyStrikethrough() },
-                onHeading: { level in applyHeading(level) },
-                onTextColor: { color in applyTextColor(color) },
-                onBulletList: { applyBulletList() },
-                onNumberedList: { applyNumberedList() },
-                onCheckboxList: { applyCheckboxList() },
-                onDictation: { applyDictation() }
-            )
-
-            // Rich text editor
-            RichTextEditorWithRef(
-                content: $page.content,
-                selectionState: $selectionState,
-                textView: $richTextView,
-                isComicSansMode: isComicSansMode
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.trailing, 32)
-            .padding(.bottom, 32)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.vibeyBackground)
         .onAppear {
             if page.title.isEmpty {
@@ -547,6 +627,9 @@ struct RichTextEditorWithRef: NSViewRepresentable {
     @Binding var selectionState: TextSelectionState
     @Binding var textView: RichNSTextView?
     var isComicSansMode: Bool = false
+    var onSelectionChanged: ((Bool, NSRect?) -> Void)? = nil
+    var onMoreIconClicked: ((NSRect) -> Void)? = nil
+    var onEscapePressed: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
@@ -609,6 +692,22 @@ struct RichTextEditorWithRef: NSViewRepresentable {
             self.textView = textView
         }
 
+        // Wire up selection change callback
+        let coordinator = context.coordinator
+        textView.onSelectionChanged = { hasSelection, selectionRect in
+            coordinator.parent.onSelectionChanged?(hasSelection, selectionRect)
+        }
+
+        // Wire up more icon click callback
+        textView.onMoreIconClicked = { lineRect in
+            coordinator.parent.onMoreIconClicked?(lineRect)
+        }
+
+        // Wire up escape key callback
+        textView.onEscapePressed = {
+            coordinator.parent.onEscapePressed?()
+        }
+
         // Load initial content
         loadContent(into: textView)
 
@@ -623,6 +722,17 @@ struct RichTextEditorWithRef: NSViewRepresentable {
             DispatchQueue.main.async {
                 self.textView = textView
             }
+        }
+
+        // Update callbacks
+        textView.onSelectionChanged = { hasSelection, selectionRect in
+            context.coordinator.parent.onSelectionChanged?(hasSelection, selectionRect)
+        }
+        textView.onMoreIconClicked = { lineRect in
+            context.coordinator.parent.onMoreIconClicked?(lineRect)
+        }
+        textView.onEscapePressed = {
+            context.coordinator.parent.onEscapePressed?()
         }
 
         // Update content only if it changed externally
@@ -755,8 +865,14 @@ struct RichTextEditorWithRef: NSViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
+            guard let textView = notification.object as? RichNSTextView else { return }
             updateSelectionState(textView)
+
+            // Notify about selection change for floating toolbar
+            let selectedRange = textView.selectedRange()
+            let hasSelection = selectedRange.length > 0
+            let selectionRect = hasSelection ? textView.getSelectionRectInWindow() : nil
+            textView.onSelectionChanged?(hasSelection, selectionRect)
         }
 
         func updateSelectionState(_ textView: NSTextView) {

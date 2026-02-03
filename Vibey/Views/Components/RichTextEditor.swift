@@ -225,8 +225,14 @@ struct RichTextEditor: NSViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
+            guard let textView = notification.object as? RichNSTextView else { return }
             updateSelectionState(textView)
+
+            // Notify about selection change for floating toolbar
+            let selectedRange = textView.selectedRange()
+            let hasSelection = selectedRange.length > 0
+            let selectionRect = hasSelection ? textView.getSelectionRectInWindow() : nil
+            textView.onSelectionChanged?(hasSelection, selectionRect)
         }
 
         func updateSelectionState(_ textView: NSTextView) {
@@ -301,6 +307,15 @@ class RichNSTextView: NSTextView {
     // Left margin for hover menu icon (matches the SwiftUI padding being moved inside)
     static let hoverIconMargin: CGFloat = 32
 
+    // Callback when text selection changes: (hasSelection, selectionRect in window coordinates)
+    var onSelectionChanged: ((Bool, NSRect?) -> Void)? = nil
+
+    // Callback when the three-dots icon is clicked: (lineRect in window coordinates)
+    var onMoreIconClicked: ((NSRect) -> Void)? = nil
+
+    // Callback when Escape is pressed (for dismissing floating toolbar)
+    var onEscapePressed: (() -> Void)? = nil
+
     // Override to add left-only margin for the hover icon area
     // This shifts text right without using textContainerInset (which affects both sides)
     override var textContainerOrigin: NSPoint {
@@ -363,6 +378,51 @@ class RichNSTextView: NSTextView {
         iconString.draw(at: NSPoint(x: iconX, y: iconY), withAttributes: attributes)
     }
 
+    // Get the selection rect in window coordinates for floating toolbar positioning
+    func getSelectionRectInWindow() -> NSRect? {
+        guard let layoutManager = layoutManager,
+              let textContainer = textContainer else { return nil }
+
+        let selectedRange = selectedRange()
+        guard selectedRange.length > 0 else { return nil }
+
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: selectedRange, actualCharacterRange: nil)
+        guard glyphRange.location != NSNotFound else { return nil }
+
+        var selectionRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+
+        // Offset for text container origin
+        selectionRect.origin.x += textContainerOrigin.x
+        selectionRect.origin.y += textContainerOrigin.y
+
+        // Convert to window coordinates
+        guard window != nil else { return selectionRect }
+        return convert(selectionRect, to: nil)
+    }
+
+    // Get the line rect for the hovered line in window coordinates
+    func getHoveredLineRectInWindow() -> NSRect? {
+        guard let hoveredRange = hoveredLineRange,
+              let layoutManager = layoutManager,
+              let textStorage = textStorage,
+              textStorage.length > 0,
+              hoveredRange.location < textStorage.length else {
+            return nil
+        }
+
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
+        guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
+            return nil
+        }
+
+        var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+        lineRect.origin.x += textContainerOrigin.x
+        lineRect.origin.y += textContainerOrigin.y
+
+        guard window != nil else { return lineRect }
+        return convert(lineRect, to: nil)
+    }
+
     // Helper to get the current icon button rect for hit testing
     private func getIconButtonRect() -> NSRect? {
         guard let hoveredRange = hoveredLineRange,
@@ -415,8 +475,8 @@ class RichNSTextView: NSTextView {
         let point = convert(event.locationInWindow, from: nil)
 
         // Check if we have layout manager and text container
-        guard let layoutManager = layoutManager,
-              let textContainer = textContainer,
+        guard layoutManager != nil,
+              textContainer != nil,
               let textStorage = textStorage,
               textStorage.length > 0 else {
             if hoveredLineRange != nil || isIconHovered {
@@ -472,9 +532,15 @@ class RichNSTextView: NSTextView {
     }
 
 
-    // Handle Enter and Backspace for list continuation
+    // Handle Enter, Backspace, and Escape for list continuation and toolbar dismiss
     override func keyDown(with event: NSEvent) {
         let keyCode = event.keyCode
+
+        // Escape key - dismiss floating toolbar
+        if keyCode == 53 {
+            onEscapePressed?()
+            // Don't return - let default behavior also happen (deselect, etc.)
+        }
 
         // Enter key (Return)
         if keyCode == 36 {
@@ -785,7 +851,6 @@ class RichNSTextView: NSTextView {
     func applyHeading(_ level: Int) {
         guard let textStorage = textStorage else { return }
 
-        let fontManager = NSFontManager.shared
         let selectedRange = selectedRange()
         let paragraphRange = (string as NSString).paragraphRange(for: selectedRange)
 
@@ -1112,10 +1177,27 @@ class RichNSTextView: NSTextView {
         // This is a heuristic since there's no direct API
     }
 
-    // Handle mouse clicks for checkbox toggling
+    // Handle mouse clicks for checkbox toggling and three-dots icon
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         let charIndex = characterIndexForInsertion(at: point)
+
+        // Check if click is on the three-dots icon
+        print("DEBUG mouseDown: point=\(point), hoveredLineRange=\(String(describing: hoveredLineRange))")
+        if let iconRect = getIconButtonRect() {
+            print("DEBUG mouseDown: iconRect=\(iconRect), contains=\(iconRect.contains(point))")
+            if iconRect.contains(point) {
+                if let lineRect = getHoveredLineRectInWindow() {
+                    print("DEBUG mouseDown: calling onMoreIconClicked with lineRect=\(lineRect)")
+                    onMoreIconClicked?(lineRect)
+                } else {
+                    print("DEBUG mouseDown: getHoveredLineRectInWindow returned nil")
+                }
+                return
+            }
+        } else {
+            print("DEBUG mouseDown: getIconButtonRect returned nil")
+        }
 
         // Check if click is on a checkbox
         if charIndex < string.count {
