@@ -335,7 +335,6 @@ struct PageEditorPanel: View {
     // Floating toolbar state
     @State private var showFloatingToolbar: Bool = false
     @State private var toolbarPosition: CGPoint = .zero
-    @State private var toolbarOpenedViaIcon: Bool = false  // Track if opened via three-dots icon
 
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -414,68 +413,47 @@ struct PageEditorPanel: View {
                         textView: $richTextView,
                         isComicSansMode: isComicSansMode,
                         onSelectionChanged: { hasSelection, selectionRect in
-                            print("DEBUG: onSelectionChanged called - hasSelection: \(hasSelection), rect: \(String(describing: selectionRect))")
                             if hasSelection, let rect = selectionRect {
                                 // Position toolbar above the selection
-                                // Window coordinates have origin at bottom-left, SwiftUI at top-left
-                                // rect is in window coordinates - we need to flip Y
                                 let toolbarHeight: CGFloat = 44
-                                let toolbarWidth: CGFloat = 400 // Approximate width
+                                let toolbarWidth: CGFloat = 400
 
-                                // Get window height for coordinate conversion
+                                // Get window height for coordinate conversion (window coords have origin at bottom)
                                 let windowHeight = NSApp.keyWindow?.frame.height ?? geometry.size.height
-                                print("DEBUG: windowHeight: \(windowHeight), geometry.size: \(geometry.size)")
 
                                 // Convert Y coordinate (flip from bottom-origin to top-origin)
-                                // rect.maxY in window coords = top of selection
-                                // In SwiftUI, we want to position above that
                                 let flippedY = windowHeight - rect.maxY
 
-                                // Position toolbar above the selection (subtract toolbar height and gap)
+                                // Position toolbar above the selection
                                 let localX = max(16, min(rect.midX - toolbarWidth / 2, geometry.size.width - toolbarWidth - 16))
                                 let localY = max(16, flippedY - toolbarHeight - 8)
 
-                                // Use fixed position for debugging - center of view
-                                toolbarPosition = CGPoint(x: geometry.size.width / 2, y: 200)
-                                print("DEBUG: toolbarPosition (fixed): \(toolbarPosition)")
-                                toolbarOpenedViaIcon = false  // Reset icon state when showing via selection
+                                toolbarPosition = CGPoint(x: localX + toolbarWidth / 2, y: localY + toolbarHeight / 2)
                                 showFloatingToolbar = true
-                            } else if !toolbarOpenedViaIcon {
-                                // Only hide if not opened via icon (icon-opened toolbar persists until explicit dismiss)
+                            } else {
+                                // Hide toolbar when no text is selected
                                 showFloatingToolbar = false
                             }
                         },
                         onMoreIconClicked: { lineRect in
-                            print("DEBUG: onMoreIconClicked called - lineRect: \(lineRect)")
-                            // Toggle toolbar - if showing, hide; if hidden, show near the line
-                            if showFloatingToolbar && toolbarOpenedViaIcon {
-                                // If already showing via icon click, toggle it off
-                                showFloatingToolbar = false
-                                toolbarOpenedViaIcon = false
-                            } else {
-                                let toolbarHeight: CGFloat = 44
-                                let toolbarWidth: CGFloat = 400
+                            // Position toolbar near the line
+                            let toolbarHeight: CGFloat = 44
+                            let toolbarWidth: CGFloat = 400
 
-                                // Get window height for coordinate conversion
-                                let windowHeight = NSApp.keyWindow?.frame.height ?? geometry.size.height
-                                print("DEBUG: windowHeight: \(windowHeight), geometry.size: \(geometry.size)")
+                            // Get window height for coordinate conversion
+                            let windowHeight = NSApp.keyWindow?.frame.height ?? geometry.size.height
 
-                                // Convert Y coordinate (flip from bottom-origin to top-origin)
-                                let flippedY = windowHeight - lineRect.maxY
+                            // Convert Y coordinate (flip from bottom-origin to top-origin)
+                            let flippedY = windowHeight - lineRect.maxY
 
-                                let localX = max(16, min(lineRect.minX, geometry.size.width - toolbarWidth - 16))
-                                let localY = max(16, flippedY - toolbarHeight - 8)
+                            let localX = max(16, min(lineRect.minX, geometry.size.width - toolbarWidth - 16))
+                            let localY = max(16, flippedY - toolbarHeight - 8)
 
-                                // Use fixed position for debugging
-                                toolbarPosition = CGPoint(x: geometry.size.width / 2, y: 200)
-                                print("DEBUG: toolbarPosition (fixed): \(toolbarPosition)")
-                                toolbarOpenedViaIcon = true  // Mark as opened via icon
-                                showFloatingToolbar = true
-                            }
+                            toolbarPosition = CGPoint(x: localX + toolbarWidth / 2, y: localY + toolbarHeight / 2)
+                            showFloatingToolbar = true
                         },
                         onEscapePressed: {
                             showFloatingToolbar = false
-                            toolbarOpenedViaIcon = false
                         }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

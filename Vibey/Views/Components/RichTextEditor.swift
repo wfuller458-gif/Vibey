@@ -459,7 +459,7 @@ class RichNSTextView: NSTextView {
             removeTrackingArea(trackingArea)
         }
 
-        // Add new tracking area for mouse movement
+        // Add new tracking area for mouse movement - include the margin area
         let trackingArea = NSTrackingArea(
             rect: bounds,
             options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
@@ -467,6 +467,18 @@ class RichNSTextView: NSTextView {
             userInfo: nil
         )
         addTrackingArea(trackingArea)
+    }
+
+    // Ensure we receive mouse events in the margin area (where the icon is)
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // Convert point to local coordinates
+        let localPoint = convert(point, from: superview)
+
+        // If the point is within our bounds (including margin), claim the event
+        if bounds.contains(localPoint) {
+            return self
+        }
+        return super.hitTest(point)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -514,6 +526,13 @@ class RichNSTextView: NSTextView {
         if isIconHovered != newIconHovered {
             isIconHovered = newIconHovered
             needsRedraw = true
+
+            // Change cursor when hovering over icon
+            if isIconHovered {
+                NSCursor.pointingHand.set()
+            } else {
+                NSCursor.iBeam.set()
+            }
         }
 
         if needsRedraw {
@@ -1183,20 +1202,13 @@ class RichNSTextView: NSTextView {
         let charIndex = characterIndexForInsertion(at: point)
 
         // Check if click is on the three-dots icon
-        print("DEBUG mouseDown: point=\(point), hoveredLineRange=\(String(describing: hoveredLineRange))")
-        if let iconRect = getIconButtonRect() {
-            print("DEBUG mouseDown: iconRect=\(iconRect), contains=\(iconRect.contains(point))")
-            if iconRect.contains(point) {
-                if let lineRect = getHoveredLineRectInWindow() {
-                    print("DEBUG mouseDown: calling onMoreIconClicked with lineRect=\(lineRect)")
-                    onMoreIconClicked?(lineRect)
-                } else {
-                    print("DEBUG mouseDown: getHoveredLineRectInWindow returned nil")
-                }
-                return
+        if let iconRect = getIconButtonRect(), iconRect.contains(point) {
+            if let hoveredRange = hoveredLineRange, let lineRect = getHoveredLineRectInWindow() {
+                // Select the entire line so formatting applies to it
+                setSelectedRange(hoveredRange)
+                onMoreIconClicked?(lineRect)
             }
-        } else {
-            print("DEBUG mouseDown: getIconButtonRect returned nil")
+            return
         }
 
         // Check if click is on a checkbox
