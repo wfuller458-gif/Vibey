@@ -12,6 +12,7 @@ struct TerminalView: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var terminalState: TerminalState
     let projectID: UUID
+    let isComicSansMode: Bool
     @State private var showingClearConfirmation = false
     @State private var terminalKey = UUID() // For forcing terminal restart
     @State private var showSetupHelp = true // Start expanded, can be toggled
@@ -73,10 +74,17 @@ struct TerminalView: View {
             // Terminal content (SwiftTerm)
             SwiftTermWrapper(
                 terminalState: terminalState,
+                isComicSansMode: isComicSansMode,
                 onBell: handleBell
             )
             .id(terminalKey) // Use key to force recreation on restart
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Message input editor
+            TerminalMessageEditor(
+                terminalState: terminalState,
+                isComicSansMode: isComicSansMode
+            )
         }
         .background(Color.vibeyBackground)
         .alert("Clear Terminal?", isPresented: $showingClearConfirmation) {
@@ -296,7 +304,7 @@ struct ClaudeCodeHelpPanel: View {
 
 
 #Preview {
-    TerminalView(terminalState: TerminalState(), projectID: UUID())
+    TerminalView(terminalState: TerminalState(), projectID: UUID(), isComicSansMode: false)
         .environmentObject(AppState())
         .frame(width: 800, height: 600)
 }

@@ -8,6 +8,18 @@
 
 import SwiftUI
 
+// MARK: - Comic Sans Mode Environment Key
+private struct IsComicSansModeKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
+extension EnvironmentValues {
+    var isComicSansMode: Bool {
+        get { self[IsComicSansModeKey.self] }
+        set { self[IsComicSansModeKey.self] = newValue }
+    }
+}
+
 // MARK: - Colors
 extension Color {
     // Background colors from Figma
@@ -55,37 +67,37 @@ extension Font {
         .custom("Lexend-Thin", size: size)
     }
 
-    static func lexendLight(size: CGFloat) -> Font {
-        .custom("Lexend-Light", size: size)
+    static func lexendLight(size: CGFloat, comicSans: Bool = false) -> Font {
+        comicSans ? .custom("Comic Sans MS", size: size) : .custom("Lexend-Light", size: size)
     }
 
-    static func lexendRegular(size: CGFloat) -> Font {
-        .custom("Lexend", size: size)
+    static func lexendRegular(size: CGFloat, comicSans: Bool = false) -> Font {
+        comicSans ? .custom("Comic Sans MS", size: size) : .custom("Lexend", size: size)
     }
 
-    static func lexendMedium(size: CGFloat) -> Font {
-        .custom("Lexend-Medium", size: size)
+    static func lexendMedium(size: CGFloat, comicSans: Bool = false) -> Font {
+        comicSans ? .custom("Comic Sans MS", size: size) : .custom("Lexend-Medium", size: size)
     }
 
-    static func lexendBold(size: CGFloat) -> Font {
-        .custom("Lexend Bold", size: size)
+    static func lexendBold(size: CGFloat, comicSans: Bool = false) -> Font {
+        comicSans ? .custom("Comic Sans MS Bold", size: size) : .custom("Lexend Bold", size: size)
     }
 
-    static func lexendExtraBold(size: CGFloat) -> Font {
-        .custom("Lexend ExtraBold", size: size)
+    static func lexendExtraBold(size: CGFloat, comicSans: Bool = false) -> Font {
+        comicSans ? .custom("Comic Sans MS Bold", size: size) : .custom("Lexend ExtraBold", size: size)
     }
 
-    static func lexendBlack(size: CGFloat) -> Font {
-        .custom("Lexend Black", size: size)
+    static func lexendBlack(size: CGFloat, comicSans: Bool = false) -> Font {
+        comicSans ? .custom("Comic Sans MS Bold", size: size) : .custom("Lexend Black", size: size)
     }
 
     // Atkinson Hyperlegible - for body text
-    static func atkinsonRegular(size: CGFloat) -> Font {
-        .custom("Atkinson Hyperlegible", size: size)
+    static func atkinsonRegular(size: CGFloat, comicSans: Bool = false) -> Font {
+        comicSans ? .custom("Comic Sans MS", size: size) : .custom("Atkinson Hyperlegible", size: size)
     }
 
-    static func atkinsonBold(size: CGFloat) -> Font {
-        .custom("AtkinsonHyperlegible-Bold", size: size)
+    static func atkinsonBold(size: CGFloat, comicSans: Bool = false) -> Font {
+        comicSans ? .custom("Comic Sans MS Bold", size: size) : .custom("AtkinsonHyperlegible-Bold", size: size)
     }
 }
 

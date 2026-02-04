@@ -105,36 +105,19 @@ struct VibeyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                // Show different views based on app state
-                if appState.hasCompletedOnboarding {
-                    // User has completed onboarding
-                    if appState.projects.isEmpty {
-                        // No projects - show project creation
-                        FirstProjectView(onComplete: {
-                            // Project created, continue to main app
-                        })
-                        .environmentObject(appState)
-                    } else {
-                        // Has projects - show main app with optional projects list overlay
-                        ZStack {
-                            // Keep main app always rendered (keeps terminal alive)
-                            MainContentView()
-                                .environmentObject(appState)
-                                .environment(\.showingProjectsList, $showingProjectsList)
+            ZStack {
+                // Keep main app always rendered (keeps terminal alive)
+                MainContentView()
+                    .environmentObject(appState)
+                    .environment(\.showingProjectsList, $showingProjectsList)
+                    .environment(\.isComicSansMode, appState.isComicSansMode)
 
-                            // Show projects list on top when needed
-                            if showingProjectsList || appState.currentProject == nil {
-                                ProjectsListView()
-                                    .environmentObject(appState)
-                                    .environment(\.showingProjectsList, $showingProjectsList)
-                            }
-                        }
-                    }
-                } else {
-                    // User needs to complete onboarding
-                    OnboardingView()
+                // Show projects list on top when needed
+                if showingProjectsList || appState.currentProject == nil {
+                    ProjectsListView()
                         .environmentObject(appState)
+                        .environment(\.showingProjectsList, $showingProjectsList)
+                        .environment(\.isComicSansMode, appState.isComicSansMode)
                 }
             }
             .onAppear {

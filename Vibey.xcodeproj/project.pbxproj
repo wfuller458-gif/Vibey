@@ -27,6 +27,7 @@
 		AA0050 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0048 /* RichTextEditor.swift */; };
 		AA0051 /* FormattingToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0049 /* FormattingToolbar.swift */; };
 		AA0053 /* SpeechRecognitionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0052 /* SpeechRecognitionManager.swift */; };
+		AA0055 /* TerminalMessageEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0054 /* TerminalMessageEditor.swift */; };
 		BFFFATKBLD /* AtkinsonHyperlegible-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FFATKBLD01 /* AtkinsonHyperlegible-Bold.ttf */; };
 		BFFFATKRG /* AtkinsonHyperlegible-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FFATKRG01 /* AtkinsonHyperlegible-Regular.ttf */; };
 		BFFFLEXBLD /* Lexend-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FFLEXBLD01 /* Lexend-Bold.ttf */; };
@@ -54,6 +55,7 @@
 		AA0048 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
 		AA0049 /* FormattingToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormattingToolbar.swift; sourceTree = "<group>"; };
 		AA0052 /* SpeechRecognitionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognitionManager.swift; sourceTree = "<group>"; };
+		AA0054 /* TerminalMessageEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalMessageEditor.swift; sourceTree = "<group>"; };
 		AAAAAA /* Vibey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vibey.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FFATKBLD01 /* AtkinsonHyperlegible-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "AtkinsonHyperlegible-Bold.ttf"; path = "Vibey/Fonts/Atkinson_Hyperlegible/AtkinsonHyperlegible-Bold.ttf"; sourceTree = "<group>"; };
 		FFATKRG01 /* AtkinsonHyperlegible-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "AtkinsonHyperlegible-Regular.ttf"; path = "Vibey/Fonts/Atkinson_Hyperlegible/AtkinsonHyperlegible-Regular.ttf"; sourceTree = "<group>"; };
@@ -188,6 +190,7 @@
 			children = (
 				AA0035 /* SwiftTermWrapper.swift */,
 				AA0037 /* TerminalView.swift */,
+				AA0054 /* TerminalMessageEditor.swift */,
 			);
 			path = Terminal;
 			sourceTree = "<group>";
@@ -277,6 +280,7 @@
 				AA0034 /* TerminalState.swift in Sources */,
 				AA0036 /* SwiftTermWrapper.swift in Sources */,
 				AA0038 /* TerminalView.swift in Sources */,
+				AA0055 /* TerminalMessageEditor.swift in Sources */,
 				AA0050 /* RichTextEditor.swift in Sources */,
 				AA0051 /* FormattingToolbar.swift in Sources */,
 				AA0053 /* SpeechRecognitionManager.swift in Sources */,
