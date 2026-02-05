@@ -12,8 +12,8 @@ import AppKit
 // MARK: - Subscription Enums
 
 enum SubscriptionStatus: String, Codable {
-    case trial          // In 14-day free trial
-    case comicSansTrial // Second 14-day trial with Comic Sans punishment
+    case trial          // In 7-day free trial
+    case comicSansTrial // Second 7-day trial with Comic Sans punishment
     case active         // Paid and active
     case paymentFailed  // Payment issue
     case cancelled      // Cancelled but still in paid period
@@ -336,9 +336,9 @@ class AppState: ObservableObject {
         let now = Date()
 
         // ⚠️ DEBUG: Change this to preview different trial states
-        // Options: 0 = day 1 (14 days left), 13 = last day of normal trial,
-        //          14 = first day of Comic Sans, 27 = last day of Comic Sans,
-        //          28 = expired
+        // Options: 0 = day 1 (7 days left), 6 = last day of normal trial,
+        //          7 = first day of Comic Sans, 13 = last day of Comic Sans,
+        //          14 = expired
         // Set to -1 for normal behavior before release!
         let debugDaysIntoTrial = -1  // Normal behavior
 
@@ -355,8 +355,8 @@ class AppState: ObservableObject {
             trialStartDate = startDate
             UserDefaults.standard.set(startDate, forKey: "trialStartDate")
 
-            // Set first trial end date (14 days from start)
-            let endDate = Calendar.current.date(byAdding: .day, value: 14, to: startDate)!
+            // Set first trial end date (7 days from start)
+            let endDate = Calendar.current.date(byAdding: .day, value: 7, to: startDate)!
             trialEndDate = endDate
             UserDefaults.standard.set(endDate, forKey: "trialEndDate")
             subscriptionStatus = .trial
@@ -369,19 +369,19 @@ class AppState: ObservableObject {
         // Calculate days since trial started
         let daysSinceStart = Calendar.current.dateComponents([.day], from: startDate, to: now).day ?? 0
 
-        if daysSinceStart < 14 {
-            // First 14 days - normal trial
+        if daysSinceStart < 7 {
+            // First 7 days - normal trial
             subscriptionStatus = .trial
-        } else if daysSinceStart < 28 {
-            // Days 15-28 - Comic Sans trial!
+        } else if daysSinceStart < 14 {
+            // Days 8-14 - Comic Sans trial!
             subscriptionStatus = .comicSansTrial
-            // Update trial end date to day 28
-            if trialEndDate != Calendar.current.date(byAdding: .day, value: 28, to: startDate) {
-                trialEndDate = Calendar.current.date(byAdding: .day, value: 28, to: startDate)
+            // Update trial end date to day 14
+            if trialEndDate != Calendar.current.date(byAdding: .day, value: 14, to: startDate) {
+                trialEndDate = Calendar.current.date(byAdding: .day, value: 14, to: startDate)
                 UserDefaults.standard.set(trialEndDate, forKey: "trialEndDate")
             }
         } else {
-            // After 28 days - fully expired
+            // After 14 days - fully expired
             subscriptionStatus = .expired
         }
 
@@ -394,11 +394,11 @@ class AppState: ObservableObject {
         let daysSinceStart = Calendar.current.dateComponents([.day], from: startDate, to: now).day ?? 0
 
         if subscriptionStatus == .trial {
-            // First trial: days 0-13, show 14 down to 1
-            return max(0, 14 - daysSinceStart)
+            // First trial: days 0-6, show 7 down to 1
+            return max(0, 7 - daysSinceStart)
         } else if subscriptionStatus == .comicSansTrial {
-            // Comic Sans trial: days 14-27, show 14 down to 1
-            return max(0, 28 - daysSinceStart)
+            // Comic Sans trial: days 7-13, show 7 down to 1
+            return max(0, 14 - daysSinceStart)
         }
         return 0
     }
