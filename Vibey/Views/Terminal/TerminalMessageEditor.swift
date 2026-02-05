@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AppKit
+import CoreGraphics
 
 // MARK: - MessageNSTextView
 
@@ -46,9 +47,17 @@ class MessageNSTextView: NSTextView {
 
     /// Stop the built-in macOS dictation
     @objc func stopSystemDictation() {
-        // Toggle dictation again to stop it - this confirms the text instead of canceling
-        let dictationSelector = NSSelectorFromString("startDictation:")
-        NSApp.sendAction(dictationSelector, to: nil, from: self)
+        // Post Escape key event to the system to dismiss dictation
+        let escapeKeyCode: UInt16 = 53
+
+        // Key down
+        if let escapeDown = CGEvent(keyboardEventSource: nil, virtualKey: escapeKeyCode, keyDown: true) {
+            escapeDown.post(tap: .cghidEventTap)
+        }
+        // Key up
+        if let escapeUp = CGEvent(keyboardEventSource: nil, virtualKey: escapeKeyCode, keyDown: false) {
+            escapeUp.post(tap: .cghidEventTap)
+        }
 
         isDictating = false
         onDictationStateChanged?(false)
