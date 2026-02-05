@@ -98,6 +98,10 @@ struct RichTextEditor: NSViewRepresentable {
         // Update content only if it changed externally
         if context.coordinator.isUpdating { return }
 
+        // Don't interfere with content while dictation is active
+        // macOS dictation uses provisional text that can temporarily disappear
+        if textView.isDictating { return }
+
         let currentRTF = textView.textStorage?.rtf(from: NSRange(location: 0, length: textView.textStorage?.length ?? 0), documentAttributes: [:])
         if currentRTF != content {
             loadContent(into: textView)
@@ -144,6 +148,11 @@ struct RichTextEditor: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? RichNSTextView,
                   let textStorage = textView.textStorage else { return }
+
+            // Don't sync content while dictation is active
+            // macOS dictation uses provisional text that can temporarily disappear
+            // We'll sync when dictation ends
+            if textView.isDictating { return }
 
             // Check for auto-list triggers ("- " or "1. " at start of line)
             checkAutoListTrigger(textView: textView, textStorage: textStorage)
@@ -1171,6 +1180,12 @@ class RichNSTextView: NSTextView {
 
         isDictating = false
         onDictationStateChanged?(false)
+
+        // Trigger content sync after dictation ends
+        // Use a brief delay to let macOS finalize the dictated text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.didChangeText()
+        }
     }
 
     /// Toggle dictation on/off
@@ -1194,6 +1209,15 @@ class RichNSTextView: NSTextView {
         super.didChangeText()
         // Check if dictation panel is still visible - if not, update state
         // This is a heuristic since there's no direct API
+    }
+
+    // Sync content when dictation finalizes (marked text is committed)
+    override func unmarkText() {
+        super.unmarkText()
+        // Sync content after dictation commits text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.didChangeText()
+        }
     }
 
     // Handle mouse clicks for checkbox toggling and three-dots icon
