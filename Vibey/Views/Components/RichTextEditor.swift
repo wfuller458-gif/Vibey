@@ -98,9 +98,8 @@ struct RichTextEditor: NSViewRepresentable {
         // Update content only if it changed externally
         if context.coordinator.isUpdating { return }
 
-        // Don't interfere with content while dictation is active
-        // macOS dictation uses provisional text that can temporarily disappear
-        if textView.isDictating { return }
+        // Don't interfere while there's uncommitted input (e.g., dictation, input method)
+        if textView.hasMarkedText() { return }
 
         let currentRTF = textView.textStorage?.rtf(from: NSRange(location: 0, length: textView.textStorage?.length ?? 0), documentAttributes: [:])
         if currentRTF != content {
@@ -149,10 +148,8 @@ struct RichTextEditor: NSViewRepresentable {
             guard let textView = notification.object as? RichNSTextView,
                   let textStorage = textView.textStorage else { return }
 
-            // Don't sync content while dictation is active
-            // macOS dictation uses provisional text that can temporarily disappear
-            // We'll sync when dictation ends
-            if textView.isDictating { return }
+            // Don't sync while there's uncommitted input (e.g., dictation, input method)
+            if textView.hasMarkedText() { return }
 
             // Check for auto-list triggers ("- " or "1. " at start of line)
             checkAutoListTrigger(textView: textView, textStorage: textStorage)
@@ -338,22 +335,38 @@ class RichNSTextView: NSTextView {
         // Only draw hover icon if a line is hovered
         guard let hoveredRange = hoveredLineRange,
               let layoutManager = layoutManager,
-              let textStorage = textStorage,
-              textStorage.length > 0,
-              hoveredRange.location < textStorage.length else {
+              let textStorage = textStorage else {
             return
         }
 
-        // Get the glyph range for the hovered paragraph
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
-        guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
-            return
-        }
+        var lineRect: NSRect
 
-        // Get the line fragment rect for the first glyph in the paragraph
-        let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
-        guard lineRect.height > 0 else {
-            return
+        // Handle empty text or empty line at end
+        if textStorage.length == 0 || hoveredRange.location >= textStorage.length {
+            // Calculate default line height from typing attributes
+            let defaultFont = (typingAttributes[.font] as? NSFont) ?? NSFont.systemFont(ofSize: 16)
+            let lineHeight = defaultFont.ascender - defaultFont.descender + defaultFont.leading + 8 // 8 is line spacing
+
+            if textStorage.length == 0 {
+                // First empty line
+                lineRect = NSRect(x: 0, y: 0, width: bounds.width, height: lineHeight)
+            } else {
+                // Empty line at end - position below last line
+                let lastGlyphIndex = layoutManager.numberOfGlyphs > 0 ? layoutManager.numberOfGlyphs - 1 : 0
+                let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+                lineRect = NSRect(x: 0, y: lastLineRect.maxY, width: bounds.width, height: lineHeight)
+            }
+        } else {
+            // Normal case - get line rect from glyph
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
+            guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
+                return
+            }
+
+            lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+            guard lineRect.height > 0 else {
+                return
+            }
         }
 
         // Button dimensions
@@ -413,18 +426,33 @@ class RichNSTextView: NSTextView {
     func getHoveredLineRectInWindow() -> NSRect? {
         guard let hoveredRange = hoveredLineRange,
               let layoutManager = layoutManager,
-              let textStorage = textStorage,
-              textStorage.length > 0,
-              hoveredRange.location < textStorage.length else {
+              let textStorage = textStorage else {
             return nil
         }
 
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
-        guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
-            return nil
+        var lineRect: NSRect
+
+        // Handle empty text or empty line at end
+        if textStorage.length == 0 || hoveredRange.location >= textStorage.length {
+            let defaultFont = (typingAttributes[.font] as? NSFont) ?? NSFont.systemFont(ofSize: 16)
+            let lineHeight = defaultFont.ascender - defaultFont.descender + defaultFont.leading + 8
+
+            if textStorage.length == 0 {
+                lineRect = NSRect(x: 0, y: 0, width: bounds.width, height: lineHeight)
+            } else {
+                let lastGlyphIndex = layoutManager.numberOfGlyphs > 0 ? layoutManager.numberOfGlyphs - 1 : 0
+                let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+                lineRect = NSRect(x: 0, y: lastLineRect.maxY, width: bounds.width, height: lineHeight)
+            }
+        } else {
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
+            guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
+                return nil
+            }
+
+            lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
         }
 
-        var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
         lineRect.origin.x += textContainerOrigin.x
         lineRect.origin.y += textContainerOrigin.y
 
@@ -436,20 +464,34 @@ class RichNSTextView: NSTextView {
     private func getIconButtonRect() -> NSRect? {
         guard let hoveredRange = hoveredLineRange,
               let layoutManager = layoutManager,
-              let textStorage = textStorage,
-              textStorage.length > 0,
-              hoveredRange.location < textStorage.length else {
+              let textStorage = textStorage else {
             return nil
         }
 
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
-        guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
-            return nil
-        }
+        var lineRect: NSRect
 
-        let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
-        guard lineRect.height > 0 else {
-            return nil
+        // Handle empty text or empty line at end
+        if textStorage.length == 0 || hoveredRange.location >= textStorage.length {
+            let defaultFont = (typingAttributes[.font] as? NSFont) ?? NSFont.systemFont(ofSize: 16)
+            let lineHeight = defaultFont.ascender - defaultFont.descender + defaultFont.leading + 8
+
+            if textStorage.length == 0 {
+                lineRect = NSRect(x: 0, y: 0, width: bounds.width, height: lineHeight)
+            } else {
+                let lastGlyphIndex = layoutManager.numberOfGlyphs > 0 ? layoutManager.numberOfGlyphs - 1 : 0
+                let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+                lineRect = NSRect(x: 0, y: lastLineRect.maxY, width: bounds.width, height: lineHeight)
+            }
+        } else {
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: hoveredRange, actualCharacterRange: nil)
+            guard glyphRange.location != NSNotFound && glyphRange.location < layoutManager.numberOfGlyphs else {
+                return nil
+            }
+
+            lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphRange.location, effectiveRange: nil)
+            guard lineRect.height > 0 else {
+                return nil
+            }
         }
 
         let buttonSize: CGFloat = 24
@@ -496,10 +538,9 @@ class RichNSTextView: NSTextView {
         let point = convert(event.locationInWindow, from: nil)
 
         // Check if we have layout manager and text container
-        guard layoutManager != nil,
+        guard let layoutManager = layoutManager,
               textContainer != nil,
-              let textStorage = textStorage,
-              textStorage.length > 0 else {
+              let textStorage = textStorage else {
             if hoveredLineRange != nil || isIconHovered {
                 hoveredLineRange = nil
                 isIconHovered = false
@@ -508,19 +549,38 @@ class RichNSTextView: NSTextView {
             return
         }
 
-        // Get character index at mouse position
-        let charIndex = characterIndexForInsertion(at: point)
-        let safeIndex = min(charIndex, textStorage.length > 0 ? textStorage.length - 1 : 0)
-
-        // Get paragraph range for this character position
-        let nsString = string as NSString
-        let paragraphRange = nsString.paragraphRange(for: NSRange(location: safeIndex, length: 0))
-
         var needsRedraw = false
+        var newHoveredRange: NSRange?
+
+        if textStorage.length == 0 {
+            // Empty text - treat as hovering first (empty) line
+            // Use a sentinel range to indicate "first empty line"
+            newHoveredRange = NSRange(location: 0, length: 0)
+        } else {
+            // Get character index at mouse position
+            let charIndex = characterIndexForInsertion(at: point)
+            let nsString = string as NSString
+
+            // Check if mouse is below the last line of text
+            let lastGlyphIndex = layoutManager.numberOfGlyphs > 0 ? layoutManager.numberOfGlyphs - 1 : 0
+            let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+            let lastLineBottom = lastLineRect.maxY
+
+            if point.y > lastLineBottom && nsString.hasSuffix("\n") {
+                // Mouse is below last text line and text ends with newline
+                // This means we're on an empty line after the newline
+                // Use a special range to indicate "empty line at end"
+                newHoveredRange = NSRange(location: textStorage.length, length: 0)
+            } else {
+                // Normal case - get paragraph for character at mouse position
+                let safeIndex = min(charIndex, textStorage.length > 0 ? textStorage.length - 1 : 0)
+                newHoveredRange = nsString.paragraphRange(for: NSRange(location: safeIndex, length: 0))
+            }
+        }
 
         // Update hovered line
-        if hoveredLineRange != paragraphRange {
-            hoveredLineRange = paragraphRange
+        if hoveredLineRange != newHoveredRange {
+            hoveredLineRange = newHoveredRange
             needsRedraw = true
         }
 
@@ -1214,7 +1274,11 @@ class RichNSTextView: NSTextView {
     // Sync content when dictation finalizes (marked text is committed)
     override func unmarkText() {
         super.unmarkText()
-        // Sync content after dictation commits text
+        // Dictation has ended - reset state and sync content
+        if isDictating {
+            isDictating = false
+            onDictationStateChanged?(false)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.didChangeText()
         }

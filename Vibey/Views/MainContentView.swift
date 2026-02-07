@@ -716,8 +716,8 @@ struct RichTextEditorWithRef: NSViewRepresentable {
         // Update content only if it changed externally
         if context.coordinator.isUpdating { return }
 
-        // Don't reload content while dictation is active
-        if textView.isDictating || textView.hasMarkedText() { return }
+        // Don't reload content while there's uncommitted input (e.g., dictation, input method)
+        if textView.hasMarkedText() { return }
 
         let currentRTF = textView.textStorage?.rtf(from: NSRange(location: 0, length: textView.textStorage?.length ?? 0), documentAttributes: [:])
         if currentRTF != content {
@@ -766,8 +766,8 @@ struct RichTextEditorWithRef: NSViewRepresentable {
             guard let textView = notification.object as? RichNSTextView,
                   let textStorage = textView.textStorage else { return }
 
-            // Don't sync while dictation is active - macOS uses provisional text
-            if textView.isDictating || textView.hasMarkedText() { return }
+            // Don't sync while there's uncommitted input (e.g., dictation, input method)
+            if textView.hasMarkedText() { return }
 
             // Check for auto-list triggers ("- " or "1. " at start of line)
             checkAutoListTrigger(textView: textView, textStorage: textStorage)
