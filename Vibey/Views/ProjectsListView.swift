@@ -16,52 +16,41 @@ struct ProjectsListView: View {
 
     var body: some View {
         ZStack {
-            // Background grid pattern
-            Image("Background")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-
+            // Base background color
             Color.vibeyBackground
                 .ignoresSafeArea()
-                .opacity(0.95)
+
+            // Background grid pattern (centered)
+            GeometryReader { geometry in
+                Image("Background")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            }
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Top navigation bar
                 HStack {
-                    // Logo on left
+                    // Logo on left (matches sidebar positioning)
                     Image("VibeyLogo")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 29.538)
 
                     Spacer()
-
-                    // User profile on right
-                    HStack(spacing: 8) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.vibeyBlue)
-                                .frame(width: 24, height: 24)
-
-                            Text("WF")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-
-                        Text("Will Fuller")
-                            .font(.atkinsonRegular(size: 16))
-                            .foregroundColor(.white)
-                            .kerning(1.12)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.clear)
-                    .cornerRadius(8)
                 }
                 .padding(16)
                 .frame(height: 64)
-                .background(.ultraThinMaterial.opacity(0.5))
+                .frame(maxWidth: .infinity)
+                .background(Color(hex: "121418").ignoresSafeArea(edges: .top))
+                .overlay(
+                    Rectangle()
+                        .fill(Color(hex: "242529"))
+                        .frame(height: 1),
+                    alignment: .bottom
+                )
 
                 Spacer()
 
