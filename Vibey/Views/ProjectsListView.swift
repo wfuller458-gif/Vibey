@@ -31,9 +31,8 @@ struct ProjectsListView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Top navigation bar
+                // Top navigation bar (matches sidebar positioning)
                 HStack {
-                    // Logo on left (matches sidebar positioning)
                     Image("VibeyLogo")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -42,8 +41,7 @@ struct ProjectsListView: View {
                     Spacer()
                 }
                 .padding(16)
-                .frame(height: 64)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(hex: "121418").ignoresSafeArea(edges: .top))
                 .overlay(
                     Rectangle()
