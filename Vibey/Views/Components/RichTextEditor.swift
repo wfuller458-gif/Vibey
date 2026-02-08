@@ -1284,6 +1284,46 @@ class RichNSTextView: NSTextView {
         }
     }
 
+    // MARK: - Paste as Plain Text
+
+    /// Override paste to strip formatting and apply default text style
+    override func paste(_ sender: Any?) {
+        let pasteboard = NSPasteboard.general
+
+        // Get plain text from pasteboard (strips any formatting)
+        guard let plainText = pasteboard.string(forType: .string), !plainText.isEmpty else {
+            return
+        }
+
+        // Build default attributes matching the app's text style
+        let defaultFont = NSFont.systemFont(ofSize: 16)
+        let defaultColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0) // vibeyText
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = 8
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: defaultFont,
+            .foregroundColor: defaultColor,
+            .paragraphStyle: paragraphStyle
+        ]
+
+        let attributedText = NSAttributedString(string: plainText, attributes: attributes)
+
+        // Insert at current selection (replacing any selected text)
+        guard let textStorage = textStorage else { return }
+        let selectedRange = selectedRange()
+
+        textStorage.beginEditing()
+        textStorage.replaceCharacters(in: selectedRange, with: attributedText)
+        textStorage.endEditing()
+
+        // Move cursor to end of pasted text
+        let newCursorPos = selectedRange.location + plainText.count
+        setSelectedRange(NSRange(location: newCursorPos, length: 0))
+
+        didChangeText()
+    }
+
     // Handle mouse clicks for checkbox toggling and three-dots icon
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
