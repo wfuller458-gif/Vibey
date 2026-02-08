@@ -122,8 +122,11 @@ struct MainContentView: View {
         // Send text directly (no bracketed paste - Claude handles multi-line input)
         terminalState.sendText(contextText)
 
-        // After a small delay, send Enter to submit to Claude
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        // Use longer delay for larger content - Claude Code needs time to process
+        let delay = contextText.count > 500 ? 0.3 : 0.05
+
+        // After delay, send Enter to submit to Claude
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             terminalState.sendText("\r")
         }
 
