@@ -19,8 +19,28 @@ struct TerminalView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Minimal toolbar with clear button
+            // Minimal toolbar with clear button and help toggle
             HStack {
+                // Show help toggle button when help is hidden
+                if !showSetupHelp {
+                    Button(action: {
+                        withAnimation {
+                            showSetupHelp = true
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 12))
+                                .foregroundColor(.vibeyBlue)
+
+                            Text("Show Setup Help")
+                                .font(.atkinsonRegular(size: 12))
+                                .foregroundColor(.vibeyBlue)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 Spacer()
 
                 Button(action: {
@@ -37,30 +57,6 @@ struct TerminalView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color(hex: "1C1E22"))
-
-            // Show help toggle button when help is hidden
-            if !showSetupHelp {
-                Button(action: {
-                    withAnimation {
-                        showSetupHelp = true
-                    }
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 12))
-                            .foregroundColor(.vibeyBlue)
-
-                        Text("Show Setup Help")
-                            .font(.atkinsonRegular(size: 12))
-                            .foregroundColor(.vibeyBlue)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(hex: "1C1E22"))
-                }
-                .buttonStyle(.plain)
-            }
 
             // Setup help panel (collapsible)
             if showSetupHelp {
@@ -203,7 +199,8 @@ struct ClaudeCodeHelpPanel: View {
 
                 Text("Getting Claude Code Working")
                     .font(.atkinsonRegular(size: 14))
-                    .foregroundColor(.vibeyText)
+                    .fontWeight(.bold)
+                    .foregroundColor(.vibeyBlue)
                     .kerning(0.98)
 
                 Spacer()
@@ -211,7 +208,7 @@ struct ClaudeCodeHelpPanel: View {
                 Button(action: onDismiss) {
                     Image(systemName: "chevron.up")
                         .font(.system(size: 12))
-                        .foregroundColor(.vibeyText.opacity(0.7))
+                        .foregroundColor(.white)
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
@@ -222,75 +219,33 @@ struct ClaudeCodeHelpPanel: View {
             .background(Color(hex: "1C1E22"))
 
             // Steps
-            VStack(alignment: .leading, spacing: 16) {
-                // Main instruction
-                HStack(spacing: 6) {
-                    Text("To get started, type")
-                        .font(.atkinsonRegular(size: 14))
-                        .foregroundColor(.vibeyText)
+            VStack(alignment: .leading, spacing: 0) {
+                // Step 1: Get Started
+                HelpStepRow(
+                    title: "Get Started",
+                    description: "Type the following command in the terminal below to launch Claude.",
+                    command: "claude",
+                    showDivider: true
+                )
 
-                    Text("claude")
-                        .font(.custom("SF Mono", size: 12))
-                        .foregroundColor(.vibeyBlue)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color(hex: "1C1E22"))
-                        .cornerRadius(4)
+                // Step 2: Check Installation
+                HelpStepRow(
+                    title: "Check Installation",
+                    description: "If nothing happens, verify Claude Code is installed by running this command.",
+                    command: "claude --version",
+                    showDivider: true
+                )
 
-                    Text("in the terminal below.")
-                        .font(.atkinsonRegular(size: 14))
-                        .foregroundColor(.vibeyText)
-                }
-
-                // Diagnostic step
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("If nothing happens, check that Claude Code is installed by running")
-                        .font(.atkinsonRegular(size: 12))
-                        .foregroundColor(.vibeyText.opacity(0.7))
-
-                    // Copyable command
-                    HStack(spacing: 8) {
-                        Text("claude --version")
-                            .font(.custom("SF Mono", size: 11))
-                            .foregroundColor(.vibeyBlue)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: "1C1E22"))
-                            .cornerRadius(4)
-
-                        Button(action: {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString("claude --version", forType: .string)
-                        }) {
-                            Image(systemName: "doc.on.doc")
-                                .font(.system(size: 11))
-                                .foregroundColor(.vibeyText.opacity(0.6))
-                        }
-                        .buttonStyle(.plain)
-                        .help("Copy")
-                    }
-                }
-
-                // Installation link
-                HStack(spacing: 8) {
-                    Text("Need to install it?")
-                        .font(.atkinsonRegular(size: 12))
-                        .foregroundColor(.vibeyText.opacity(0.7))
-
-                    Button(action: {
-                        if let url = URL(string: "https://docs.anthropic.com/claude/docs/claude-code") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }) {
-                        Text("Claude Code Installation Guide")
-                            .font(.atkinsonRegular(size: 12))
-                            .foregroundColor(.vibeyBlue)
-                            .underline()
-                    }
-                    .buttonStyle(.plain)
-                }
+                // Step 3: Need to Install?
+                HelpStepRow(
+                    title: "Need to Install?",
+                    description: "Follow the official installation guide to set up Claude Code on your system.",
+                    linkText: "Claude Code Installation Guide",
+                    linkURL: "https://docs.anthropic.com/en/docs/claude-code/getting-started",
+                    showDivider: false
+                )
             }
-            .padding(16)
+            .padding(.vertical, 8)
             .background(Color.vibeyBackground)
         }
         .overlay(
@@ -299,6 +254,91 @@ struct ClaudeCodeHelpPanel: View {
                 .frame(height: 1),
             alignment: .bottom
         )
+    }
+}
+
+// MARK: - Help Step Row
+
+struct HelpStepRow: View {
+    let title: String
+    let description: String
+    var command: String? = nil
+    var linkText: String? = nil
+    var linkURL: String? = nil
+    let showDivider: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                    // Title
+                    Text(title)
+                        .font(.atkinsonRegular(size: 14))
+                        .fontWeight(.semibold)
+                        .foregroundColor(.vibeyText)
+
+                    // Description
+                    Text(description)
+                        .font(.atkinsonRegular(size: 12))
+                        .foregroundColor(.vibeyText.opacity(0.6))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Command with copy button (if provided)
+                    if let command = command {
+                        HStack(spacing: 8) {
+                            Text(command)
+                                .font(.custom("SF Mono", size: 11))
+                                .foregroundColor(.vibeyBlue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(hex: "1C1E22"))
+                                .cornerRadius(4)
+
+                            Button(action: {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(command, forType: .string)
+                            }) {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.vibeyText.opacity(0.5))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Copy to clipboard")
+                        }
+                        .padding(.top, 4)
+                    }
+
+                    // Link (if provided)
+                    if let linkText = linkText, let linkURL = linkURL {
+                        Button(action: {
+                            if let url = URL(string: linkURL) {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Text(linkText)
+                                    .font(.atkinsonRegular(size: 12))
+                                    .foregroundColor(.vibeyBlue)
+
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.vibeyBlue)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 4)
+                    }
+                }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            // Divider
+            if showDivider {
+                Rectangle()
+                    .fill(Color.vibeyCardBorder)
+                    .frame(height: 1)
+                    .padding(.leading, 16)
+            }
+        }
     }
 }
 

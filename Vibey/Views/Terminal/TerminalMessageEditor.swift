@@ -136,7 +136,7 @@ struct MessageInputField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = false
+        scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
@@ -233,6 +233,9 @@ struct MessageInputField: NSViewRepresentable {
             isUpdating = true
             parent.text = textView.string
             isUpdating = false
+
+            // Update height as user types
+            updateHeight()
         }
 
         func updateHeight() {
@@ -248,10 +251,10 @@ struct MessageInputField: NSViewRepresentable {
             let usedRect = layoutManager.usedRect(for: textContainer)
             let contentHeight = usedRect.height + textView.textContainerInset.height * 2
 
-            // Clamp to 1-4 lines (approximately 22pt per line)
+            // Clamp to 1-6 lines (approximately 22pt per line)
             let lineHeight: CGFloat = 22
             let minHeight = lineHeight
-            let maxHeight = lineHeight * 4
+            let maxHeight = lineHeight * 6
             let clampedHeight = min(max(contentHeight, minHeight), maxHeight)
 
             parent.onHeightChange?(clampedHeight)
