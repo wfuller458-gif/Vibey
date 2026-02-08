@@ -116,16 +116,15 @@ struct MainContentView: View {
             contextText += plainContent
         }
 
-        // Use bracketed paste mode to prevent line-by-line execution
-        // This tells the terminal "this is pasted text, don't execute each line"
-        // ESC[200~ = start bracketed paste, ESC[201~ = end bracketed paste
-        let bracketedText = "\u{1b}[200~\(contextText)\u{1b}[201~"
+        // Capture terminalState reference for the closure
+        let terminalState = currentProject.terminalState
 
-        currentProject.terminalState.sendText(bracketedText)
+        // Send text directly (no bracketed paste - Claude handles multi-line input)
+        terminalState.sendText(contextText)
 
         // After a small delay, send Enter to submit to Claude
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            currentProject.terminalState.sendText("\r")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            terminalState.sendText("\r")
         }
 
         // Update page status to shared
