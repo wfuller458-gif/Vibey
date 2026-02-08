@@ -32,6 +32,9 @@ class WindowDelegate: NSObject, NSWindowDelegate {
                 }
             }
 
+            // Force UserDefaults to save immediately before terminating
+            UserDefaults.standard.synchronize()
+
             // Terminate the app
             NSApplication.shared.terminate(nil)
             return true
