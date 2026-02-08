@@ -349,15 +349,18 @@ struct TerminalMessageEditor: View {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
+        // Send text first
         if text.contains("\n") {
             // Multi-line: use bracketed paste mode
             terminalState.sendText("\u{1b}[200~\(text)\u{1b}[201~")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                terminalState.sendText("\r")
-            }
         } else {
-            // Single line: just send with carriage return
-            terminalState.sendText(text + "\r")
+            // Single line: just send the text
+            terminalState.sendText(text)
+        }
+
+        // Send Enter key after a brief delay to ensure Claude Code receives it
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            terminalState.sendText("\r")
         }
 
         messageText = ""
