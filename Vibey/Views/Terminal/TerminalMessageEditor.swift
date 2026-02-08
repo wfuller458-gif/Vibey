@@ -267,6 +267,7 @@ struct MessageInputField: NSViewRepresentable {
 struct TerminalMessageEditor: View {
     @ObservedObject var terminalState: TerminalState
     let isComicSansMode: Bool
+    var onClear: (() -> Void)? = nil
 
     @State private var messageText: String = ""
     @State private var textFieldHeight: CGFloat = 22
@@ -348,6 +349,11 @@ struct TerminalMessageEditor: View {
     private func sendMessage() {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+
+        // Detect /clear command and notify to clear page statuses
+        if text == "/clear" {
+            onClear?()
+        }
 
         // Send text first
         if text.contains("\n") {

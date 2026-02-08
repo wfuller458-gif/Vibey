@@ -79,7 +79,10 @@ struct TerminalView: View {
             // Message input editor
             TerminalMessageEditor(
                 terminalState: terminalState,
-                isComicSansMode: isComicSansMode
+                isComicSansMode: isComicSansMode,
+                onClear: {
+                    appState.clearAllPageStatuses(for: projectID)
+                }
             )
         }
         .background(Color.vibeyBackground)
