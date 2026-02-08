@@ -15,6 +15,8 @@ class WindowDelegate: NSObject, NSWindowDelegate {
     weak var appState: AppState?
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        print("🔴 windowShouldClose called")
+
         let alert = NSAlert()
         alert.messageText = "Close Vibey?"
         alert.informativeText = "All terminal history will be deleted for all projects. This action cannot be undone."
@@ -25,15 +27,21 @@ class WindowDelegate: NSObject, NSWindowDelegate {
         let response = alert.runModal()
 
         if response == .alertFirstButtonReturn {
+            print("🔴 User clicked Close")
             // User clicked "Close" - clear all page statuses before closing
             if let appState = appState {
+                print("🔴 AppState found, clearing \(appState.projects.count) projects")
                 for project in appState.projects {
+                    print("🔴 Clearing statuses for project: \(project.name)")
                     appState.clearAllPageStatuses(for: project.id)
                 }
+            } else {
+                print("🔴 AppState is nil!")
             }
 
             // Force UserDefaults to save immediately before terminating
             UserDefaults.standard.synchronize()
+            print("🔴 UserDefaults synchronized")
 
             // Terminate the app
             NSApplication.shared.terminate(nil)
@@ -52,9 +60,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Set delegate on the main window to intercept close events
+        print("🟢 applicationDidFinishLaunching - windows count: \(NSApplication.shared.windows.count)")
         if let window = NSApplication.shared.windows.first {
             windowDelegate.appState = appState
             window.delegate = windowDelegate
+            print("🟢 Window delegate set, appState is \(appState == nil ? "nil" : "set")")
+        } else {
+            print("🟢 No window found!")
         }
     }
 }
@@ -124,8 +136,10 @@ struct VibeyApp: App {
                 }
             }
             .onAppear {
-                // Pass appState to delegate
+                // Pass appState to delegate and window delegate
                 appDelegate.appState = appState
+                appDelegate.windowDelegate.appState = appState
+                print("🟡 onAppear - appState passed to delegates")
             }
         }
         .windowStyle(.hiddenTitleBar)
