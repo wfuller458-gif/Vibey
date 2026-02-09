@@ -394,9 +394,50 @@ class RichNSTextView: NSTextView {
         ]
     }
 
+    // MARK: - Undo Support
+
+    /// Replace text in range with undo support
+    private func replaceTextWithUndo(in range: NSRange, with string: NSAttributedString) {
+        guard let textStorage = textStorage else { return }
+
+        // Check if change is allowed (this registers with undo manager)
+        if shouldChangeText(in: range, replacementString: string.string) {
+            textStorage.beginEditing()
+            textStorage.replaceCharacters(in: range, with: string)
+            textStorage.endEditing()
+            didChangeText()
+        }
+    }
+
+    /// Apply attributes to a range with undo support
+    private func applyAttributesWithUndo(in range: NSRange, apply: (NSMutableAttributedString) -> Void) {
+        guard let textStorage = textStorage, range.length > 0 else { return }
+
+        // Save old attributed string for undo
+        let oldAttributedString = textStorage.attributedSubstring(from: range)
+
+        // Register undo
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            guard let self = self else { return }
+            self.textStorage?.beginEditing()
+            self.textStorage?.replaceCharacters(in: range, with: oldAttributedString)
+            self.textStorage?.endEditing()
+            self.didChangeText()
+        }
+
+        // Apply the changes
+        let mutableCopy = NSMutableAttributedString(attributedString: textStorage.attributedSubstring(from: range))
+        apply(mutableCopy)
+
+        textStorage.beginEditing()
+        textStorage.replaceCharacters(in: range, with: mutableCopy)
+        textStorage.endEditing()
+        didChangeText()
+    }
+
     /// Insert an image at the current cursor position
     func insertImage(_ image: NSImage, maxWidth: CGFloat = 500) {
-        guard let textStorage = textStorage else { return }
+        guard textStorage != nil else { return }
 
         // Scale image to fit
         let scaledImage = scaleImageToFit(image, maxWidth: maxWidth)
@@ -413,10 +454,10 @@ class RichNSTextView: NSTextView {
         attachmentString.append(newlineString)
 
         let insertLocation = selectedRange().location
+        let insertRange = selectedRange()
 
-        textStorage.beginEditing()
-        textStorage.replaceCharacters(in: selectedRange(), with: attachmentString)
-        textStorage.endEditing()
+        // Use undo-aware replacement
+        replaceTextWithUndo(in: insertRange, with: attachmentString)
 
         // Position cursor after the newline
         setSelectedRange(NSRange(location: insertLocation + 2, length: 0))
@@ -424,7 +465,6 @@ class RichNSTextView: NSTextView {
         // Reset typing attributes to default so subsequent typing looks correct
         typingAttributes = defaultTextAttributes
 
-        didChangeText()
         onImageInserted?()
     }
 
@@ -782,6 +822,19 @@ class RichNSTextView: NSTextView {
     }
 
 
+    // MARK: - Undo Coalescing Control
+
+    /// Track last character for sentence boundary detection
+    private var lastInsertedChar: Character?
+
+    /// Override insertNewline to break undo coalescing after each line
+    override func insertNewline(_ sender: Any?) {
+        super.insertNewline(sender)
+        // Break undo coalescing after newline - each line is a separate undo unit
+        breakUndoCoalescing()
+        lastInsertedChar = "\n"
+    }
+
     // Handle Enter, Backspace, and Escape for list continuation and toolbar dismiss
     override func keyDown(with event: NSEvent) {
         let keyCode = event.keyCode
@@ -795,6 +848,8 @@ class RichNSTextView: NSTextView {
         // Enter key (Return)
         if keyCode == 36 {
             if handleEnterKey() {
+                // Break undo coalescing after list operations too
+                breakUndoCoalescing()
                 return
             }
         }
@@ -960,11 +1015,11 @@ class RichNSTextView: NSTextView {
     }
 
     private func applyBoldFormatting() {
-        guard let textStorage = textStorage else { return }
-        let selectedRange = selectedRange()
+        guard textStorage != nil else { return }
+        let range = selectedRange()
         let fontManager = NSFontManager.shared
 
-        if selectedRange.length == 0 {
+        if range.length == 0 {
             // Apply to typing attributes with toggle
             var attrs = typingAttributes
             if let font = attrs[.font] as? NSFont {
@@ -980,32 +1035,31 @@ class RichNSTextView: NSTextView {
                 notifyTypingAttributesChanged()
             }
         } else {
-            // Apply to selection
-            textStorage.beginEditing()
-            textStorage.enumerateAttribute(.font, in: selectedRange, options: []) { value, range, _ in
-                if let font = value as? NSFont {
-                    let currentTraits = font.fontDescriptor.symbolicTraits
-                    let newFont: NSFont
-                    if currentTraits.contains(.bold) {
-                        newFont = fontManager.convert(font, toNotHaveTrait: .boldFontMask)
-                    } else {
-                        newFont = fontManager.convert(font, toHaveTrait: .boldFontMask)
+            // Apply to selection with undo support
+            applyAttributesWithUndo(in: range) { mutableString in
+                mutableString.enumerateAttribute(.font, in: NSRange(location: 0, length: mutableString.length), options: []) { value, attrRange, _ in
+                    if let font = value as? NSFont {
+                        let currentTraits = font.fontDescriptor.symbolicTraits
+                        let newFont: NSFont
+                        if currentTraits.contains(.bold) {
+                            newFont = fontManager.convert(font, toNotHaveTrait: .boldFontMask)
+                        } else {
+                            newFont = fontManager.convert(font, toHaveTrait: .boldFontMask)
+                        }
+                        mutableString.addAttribute(.font, value: newFont, range: attrRange)
                     }
-                    textStorage.addAttribute(.font, value: newFont, range: range)
                 }
             }
-            textStorage.endEditing()
-            didChangeText()
             notifyTypingAttributesChanged()
         }
     }
 
     private func applyItalicFormatting() {
-        guard let textStorage = textStorage else { return }
-        let selectedRange = selectedRange()
+        guard textStorage != nil else { return }
+        let range = selectedRange()
         let fontManager = NSFontManager.shared
 
-        if selectedRange.length == 0 {
+        if range.length == 0 {
             // Apply to typing attributes with toggle
             var attrs = typingAttributes
             if let font = attrs[.font] as? NSFont {
@@ -1021,22 +1075,21 @@ class RichNSTextView: NSTextView {
                 notifyTypingAttributesChanged()
             }
         } else {
-            // Apply to selection
-            textStorage.beginEditing()
-            textStorage.enumerateAttribute(.font, in: selectedRange, options: []) { value, range, _ in
-                if let font = value as? NSFont {
-                    let currentTraits = font.fontDescriptor.symbolicTraits
-                    let newFont: NSFont
-                    if currentTraits.contains(.italic) {
-                        newFont = fontManager.convert(font, toNotHaveTrait: .italicFontMask)
-                    } else {
-                        newFont = fontManager.convert(font, toHaveTrait: .italicFontMask)
+            // Apply to selection with undo support
+            applyAttributesWithUndo(in: range) { mutableString in
+                mutableString.enumerateAttribute(.font, in: NSRange(location: 0, length: mutableString.length), options: []) { value, attrRange, _ in
+                    if let font = value as? NSFont {
+                        let currentTraits = font.fontDescriptor.symbolicTraits
+                        let newFont: NSFont
+                        if currentTraits.contains(.italic) {
+                            newFont = fontManager.convert(font, toNotHaveTrait: .italicFontMask)
+                        } else {
+                            newFont = fontManager.convert(font, toHaveTrait: .italicFontMask)
+                        }
+                        mutableString.addAttribute(.font, value: newFont, range: attrRange)
                     }
-                    textStorage.addAttribute(.font, value: newFont, range: range)
                 }
             }
-            textStorage.endEditing()
-            didChangeText()
             notifyTypingAttributesChanged()
         }
     }
@@ -1050,10 +1103,10 @@ class RichNSTextView: NSTextView {
     }
 
     private func applyAttribute(_ key: NSAttributedString.Key, value: Any, toggleValue: Any) {
-        guard let textStorage = textStorage else { return }
-        let selectedRange = selectedRange()
+        guard let storage = textStorage else { return }
+        let range = selectedRange()
 
-        if selectedRange.length == 0 {
+        if range.length == 0 {
             // Apply to typing attributes
             var attrs = typingAttributes
             if let currentValue = attrs[key] as? Int, currentValue != 0 {
@@ -1065,35 +1118,32 @@ class RichNSTextView: NSTextView {
             notifyTypingAttributesChanged()
         } else {
             // Check current state
-            let attrs = textStorage.attributes(at: selectedRange.location, effectiveRange: nil)
+            let attrs = storage.attributes(at: range.location, effectiveRange: nil)
             let isCurrentlyApplied = (attrs[key] as? Int ?? 0) != 0
+            let newValue = isCurrentlyApplied ? toggleValue : value
 
-            textStorage.beginEditing()
-            if isCurrentlyApplied {
-                textStorage.addAttribute(key, value: toggleValue, range: selectedRange)
-            } else {
-                textStorage.addAttribute(key, value: value, range: selectedRange)
+            // Apply with undo support
+            applyAttributesWithUndo(in: range) { mutableString in
+                mutableString.addAttribute(key, value: newValue, range: NSRange(location: 0, length: mutableString.length))
             }
-            textStorage.endEditing()
-            didChangeText()
             notifyTypingAttributesChanged()
         }
     }
 
     func applyTextColor(_ color: NSColor) {
-        guard let textStorage = textStorage else { return }
-        let selectedRange = selectedRange()
+        guard textStorage != nil else { return }
+        let range = selectedRange()
 
-        if selectedRange.length == 0 {
+        if range.length == 0 {
             var attrs = typingAttributes
             attrs[.foregroundColor] = color
             typingAttributes = attrs
             notifyTypingAttributesChanged()
         } else {
-            textStorage.beginEditing()
-            textStorage.addAttribute(.foregroundColor, value: color, range: selectedRange)
-            textStorage.endEditing()
-            didChangeText()
+            // Apply with undo support
+            applyAttributesWithUndo(in: range) { mutableString in
+                mutableString.addAttribute(.foregroundColor, value: color, range: NSRange(location: 0, length: mutableString.length))
+            }
             notifyTypingAttributesChanged()
         }
     }
@@ -1101,8 +1151,8 @@ class RichNSTextView: NSTextView {
     func applyHeading(_ level: Int) {
         guard let textStorage = textStorage else { return }
 
-        let selectedRange = selectedRange()
-        let paragraphRange = (string as NSString).paragraphRange(for: selectedRange)
+        let range = selectedRange()
+        let paragraphRange = (string as NSString).paragraphRange(for: range)
 
         let targetFontSize: CGFloat
         switch level {
@@ -1141,12 +1191,11 @@ class RichNSTextView: NSTextView {
         attrs[.font] = newFont
         typingAttributes = attrs
 
-        // Also apply to existing paragraph content if any
+        // Also apply to existing paragraph content if any with undo support
         if paragraphRange.length > 0 {
-            textStorage.beginEditing()
-            textStorage.addAttribute(.font, value: newFont, range: paragraphRange)
-            textStorage.endEditing()
-            didChangeText()
+            applyAttributesWithUndo(in: paragraphRange) { mutableString in
+                mutableString.addAttribute(.font, value: newFont, range: NSRange(location: 0, length: mutableString.length))
+            }
         }
 
         notifyTypingAttributesChanged()
@@ -1419,11 +1468,18 @@ class RichNSTextView: NSTextView {
         }
     }
 
-    // Override to detect when dictation ends naturally
+    // Override to detect when dictation ends and break undo coalescing at word boundaries
     override func insertText(_ string: Any, replacementRange: NSRange) {
         super.insertText(string, replacementRange: replacementRange)
-        // If we were dictating and text was inserted, dictation may have ended
-        // We'll rely on the explicit stop for now
+
+        // Break undo coalescing at word boundaries (after each space)
+        if let insertedString = string as? String, let lastChar = insertedString.last {
+            // Break after space - each word is a separate undo unit
+            if lastChar == " " || lastChar == "\t" {
+                breakUndoCoalescing()
+            }
+            lastInsertedChar = lastChar
+        }
     }
 
     // Detect when dictation completes
