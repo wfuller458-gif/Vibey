@@ -810,7 +810,6 @@ struct RichTextEditorWithRef: NSViewRepresentable {
         var parent: RichTextEditorWithRef
         weak var textView: RichNSTextView?
         var isUpdating = false
-        var lastSavedContent: Data?  // Track content we saved to avoid false reload triggers
 
         init(_ parent: RichTextEditorWithRef) {
             self.parent = parent
