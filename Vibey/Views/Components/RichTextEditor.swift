@@ -58,13 +58,15 @@ struct RichTextEditor: NSViewRepresentable {
         textView.textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0) // vibeyText
 
         // Text container setup
+        // Account for the left margin (hoverIconMargin) when setting text container width
+        let textContainerWidth = max(scrollView.contentSize.width - RichNSTextView.hoverIconMargin, 100)
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
-        textView.textContainer?.containerSize = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: textContainerWidth, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = false  // We manage width manually to account for margin
 
         // Default paragraph style for line spacing
         let paragraphStyle = NSMutableParagraphStyle()
@@ -94,6 +96,13 @@ struct RichTextEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? RichNSTextView else { return }
+
+        // Update text container width on resize (accounting for left margin)
+        let newWidth = max(scrollView.contentSize.width - RichNSTextView.hoverIconMargin, 100)
+        if let textContainer = textView.textContainer,
+           abs(textContainer.containerSize.width - newWidth) > 1 {
+            textContainer.containerSize = NSSize(width: newWidth, height: CGFloat.greatestFiniteMagnitude)
+        }
 
         // Update content only if it changed externally
         if context.coordinator.isUpdating { return }
