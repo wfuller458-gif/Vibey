@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct MainContentView: View {
     @EnvironmentObject var appState: AppState
@@ -114,6 +115,15 @@ struct MainContentView: View {
         let plainContent = page.plainText
         if !plainContent.isEmpty {
             contextText += plainContent
+        }
+
+        // Extract images to temp files
+        let imagePaths = page.extractImagesForTerminal()
+        if !imagePaths.isEmpty {
+            contextText += "\n\n## Images\n"
+            for path in imagePaths {
+                contextText += "- \(path)\n"
+            }
         }
 
         // Capture terminalState reference for the closure
@@ -479,7 +489,8 @@ struct PageEditorPanel: View {
                         onBulletList: { applyBulletList() },
                         onNumberedList: { applyNumberedList() },
                         onCheckboxList: { applyCheckboxList() },
-                        onDictation: { applyDictation() }
+                        onDictation: { applyDictation() },
+                        onInsertImage: { insertImageFromPicker() }
                     )
                     .fixedSize()
                     .position(toolbarPosition)
@@ -544,6 +555,23 @@ struct PageEditorPanel: View {
             }
         }
         richTextView?.toggleSystemDictation()
+    }
+
+    private func insertImageFromPicker() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.png, .jpeg, .gif, .tiff, .bmp, .webP]
+        panel.message = "Select an image to insert"
+
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                if let image = NSImage(contentsOf: url) {
+                    richTextView?.insertImage(image)
+                }
+            }
+        }
     }
 
     // MARK: - Status Properties
@@ -721,9 +749,12 @@ struct RichTextEditorWithRef: NSViewRepresentable {
         // Don't reload content while there's uncommitted input (e.g., dictation, input method)
         if textView.hasMarkedText() { return }
 
-        let currentRTF = textView.textStorage?.rtf(from: NSRange(location: 0, length: textView.textStorage?.length ?? 0), documentAttributes: [:])
-        if currentRTF != content {
-            loadContent(into: textView)
+        // Compare archived data to detect external changes
+        if let textStorage = textView.textStorage,
+           let currentData = try? NSKeyedArchiver.archivedData(withRootObject: textStorage, requiringSecureCoding: false) {
+            if currentData != content {
+                loadContent(into: textView)
+            }
         }
     }
 
@@ -733,9 +764,21 @@ struct RichTextEditorWithRef: NSViewRepresentable {
             return
         }
 
+        // Try NSKeyedUnarchiver first (new format with image support)
+        // Use non-secure coding to allow NSTextAttachment, NSImage, etc.
+        if let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: content) {
+            unarchiver.requiresSecureCoding = false
+            if let attrString = unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey) as? NSAttributedString {
+                textView.textStorage?.setAttributedString(attrString)
+                return
+            }
+        }
+        // Fall back to RTF (legacy format)
         if let attrString = NSAttributedString(rtf: content, documentAttributes: nil) {
             textView.textStorage?.setAttributedString(attrString)
-        } else if let plainText = String(data: content, encoding: .utf8) {
+        }
+        // Fall back to plain text
+        else if let plainText = String(data: content, encoding: .utf8) {
             // Use system font (San Francisco) for body text
             let font = isComicSansMode
                 ? NSFont(name: "Comic Sans MS", size: 16) ?? NSFont.systemFont(ofSize: 16)
@@ -775,8 +818,9 @@ struct RichTextEditorWithRef: NSViewRepresentable {
             checkAutoListTrigger(textView: textView, textStorage: textStorage)
 
             isUpdating = true
-            if let rtfData = textStorage.rtf(from: NSRange(location: 0, length: textStorage.length), documentAttributes: [:]) {
-                parent.content = rtfData
+            // Use NSKeyedArchiver to preserve images (RTF doesn't embed images properly)
+            if let archivedData = try? NSKeyedArchiver.archivedData(withRootObject: textStorage, requiringSecureCoding: false) {
+                parent.content = archivedData
             }
             isUpdating = false
         }

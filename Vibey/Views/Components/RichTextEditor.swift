@@ -101,9 +101,12 @@ struct RichTextEditor: NSViewRepresentable {
         // Don't interfere while there's uncommitted input (e.g., dictation, input method)
         if textView.hasMarkedText() { return }
 
-        let currentRTF = textView.textStorage?.rtf(from: NSRange(location: 0, length: textView.textStorage?.length ?? 0), documentAttributes: [:])
-        if currentRTF != content {
-            loadContent(into: textView)
+        // Compare archived data to detect external changes
+        if let textStorage = textView.textStorage,
+           let currentData = try? NSKeyedArchiver.archivedData(withRootObject: textStorage, requiringSecureCoding: false) {
+            if currentData != content {
+                loadContent(into: textView)
+            }
         }
     }
 
@@ -113,9 +116,21 @@ struct RichTextEditor: NSViewRepresentable {
             return
         }
 
+        // Try NSKeyedUnarchiver first (new format with image support)
+        // Use non-secure coding to allow NSTextAttachment, NSImage, etc.
+        if let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: content) {
+            unarchiver.requiresSecureCoding = false
+            if let attrString = unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey) as? NSAttributedString {
+                textView.textStorage?.setAttributedString(attrString)
+                return
+            }
+        }
+        // Fall back to RTF (legacy format)
         if let attrString = NSAttributedString(rtf: content, documentAttributes: nil) {
             textView.textStorage?.setAttributedString(attrString)
-        } else if let plainText = String(data: content, encoding: .utf8) {
+        }
+        // Fall back to plain text
+        else if let plainText = String(data: content, encoding: .utf8) {
             // Use system font (San Francisco) for body text - has proper bold/italic support
             let font = isComicSansMode
                 ? NSFont(name: "Comic Sans MS", size: 16) ?? NSFont.systemFont(ofSize: 16)
@@ -155,8 +170,9 @@ struct RichTextEditor: NSViewRepresentable {
             checkAutoListTrigger(textView: textView, textStorage: textStorage)
 
             isUpdating = true
-            if let rtfData = textStorage.rtf(from: NSRange(location: 0, length: textStorage.length), documentAttributes: [:]) {
-                parent.content = rtfData
+            // Use NSKeyedArchiver to preserve images (RTF doesn't embed images properly)
+            if let archivedData = try? NSKeyedArchiver.archivedData(withRootObject: textStorage, requiringSecureCoding: false) {
+                parent.content = archivedData
             }
             isUpdating = false
         }
@@ -321,6 +337,109 @@ class RichNSTextView: NSTextView {
 
     // Callback when Escape is pressed (for dismissing floating toolbar)
     var onEscapePressed: (() -> Void)? = nil
+
+    // Callback when an image is inserted (for toolbar updates)
+    var onImageInserted: (() -> Void)? = nil
+
+    // MARK: - Initialization
+
+    override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+        super.init(frame: frameRect, textContainer: container)
+        setupDragTypes()
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupDragTypes()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupDragTypes()
+    }
+
+    private func setupDragTypes() {
+        registerForDraggedTypes([.png, .tiff, .fileURL])
+    }
+
+    // MARK: - Image Insertion
+
+    /// Insert an image at the current cursor position
+    func insertImage(_ image: NSImage, maxWidth: CGFloat = 500) {
+        guard let textStorage = textStorage else { return }
+
+        // Scale image to fit
+        let scaledImage = scaleImageToFit(image, maxWidth: maxWidth)
+
+        let attachment = NSTextAttachment()
+        attachment.image = scaledImage
+
+        let attrString = NSAttributedString(attachment: attachment)
+
+        textStorage.beginEditing()
+        textStorage.replaceCharacters(in: selectedRange(), with: attrString)
+        textStorage.endEditing()
+
+        setSelectedRange(NSRange(location: selectedRange().location + 1, length: 0))
+        didChangeText()
+        onImageInserted?()
+    }
+
+    private func scaleImageToFit(_ image: NSImage, maxWidth: CGFloat) -> NSImage {
+        guard image.size.width > maxWidth else { return image }
+        let ratio = maxWidth / image.size.width
+        let newSize = NSSize(width: maxWidth, height: image.size.height * ratio)
+        let resized = NSImage(size: newSize)
+        resized.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: newSize))
+        resized.unlockFocus()
+        return resized
+    }
+
+    // MARK: - Drag & Drop for Images
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let pb = sender.draggingPasteboard
+        if pb.canReadObject(forClasses: [NSImage.self], options: nil) {
+            return .copy
+        }
+        // Check for file URLs that are images
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
+            for url in urls {
+                let ext = url.pathExtension.lowercased()
+                if ["png", "jpg", "jpeg", "gif", "tiff", "bmp", "webp"].contains(ext) {
+                    return .copy
+                }
+            }
+        }
+        return super.draggingEntered(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let pb = sender.draggingPasteboard
+
+        // Try to read images directly
+        if let images = pb.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage],
+           let image = images.first {
+            insertImage(image)
+            return true
+        }
+
+        // Try to read file URLs and load images from them
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
+            for url in urls {
+                let ext = url.pathExtension.lowercased()
+                if ["png", "jpg", "jpeg", "gif", "tiff", "bmp", "webp"].contains(ext) {
+                    if let image = NSImage(contentsOf: url) {
+                        insertImage(image)
+                        return true
+                    }
+                }
+            }
+        }
+
+        return super.performDragOperation(sender)
+    }
 
     // Override to add left-only margin for the hover icon area
     // This shifts text right without using textContainerInset (which affects both sides)
@@ -1284,13 +1403,32 @@ class RichNSTextView: NSTextView {
         }
     }
 
-    // MARK: - Paste as Plain Text
+    // MARK: - Paste (Images and Plain Text)
 
-    /// Override paste to strip formatting and apply default text style
+    /// Override paste to handle images and strip formatting from text
     override func paste(_ sender: Any?) {
         let pasteboard = NSPasteboard.general
 
-        // Get plain text from pasteboard (strips any formatting)
+        // Check for image first
+        if let image = NSImage(pasteboard: pasteboard) {
+            insertImage(image)
+            return
+        }
+
+        // Check for image file URLs
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
+            for url in urls {
+                let ext = url.pathExtension.lowercased()
+                if ["png", "jpg", "jpeg", "gif", "tiff", "bmp", "webp"].contains(ext) {
+                    if let image = NSImage(contentsOf: url) {
+                        insertImage(image)
+                        return
+                    }
+                }
+            }
+        }
+
+        // Fall back to plain text paste
         guard let plainText = pasteboard.string(forType: .string), !plainText.isEmpty else {
             return
         }

@@ -23,6 +23,7 @@ struct FormattingToolbar: View {
     var onNumberedList: () -> Void
     var onCheckboxList: () -> Void
     var onDictation: (() -> Void)? = nil
+    var onInsertImage: (() -> Void)? = nil
 
     @State private var showingColorPicker = false
 
@@ -116,6 +117,18 @@ struct FormattingToolbar: View {
             // Checkbox list
             FormatButton(systemImage: "checklist", isActive: selectionState.hasCheckbox) {
                 onCheckboxList()
+            }
+
+            // Insert image button
+            if let onInsertImage = onInsertImage {
+                Divider()
+                    .frame(height: 20)
+                    .padding(.horizontal, 4)
+
+                FormatButton(systemImage: "photo", isActive: false) {
+                    onInsertImage()
+                }
+                .help("Insert image")
             }
 
             // Dictation button
@@ -266,7 +279,8 @@ struct FormattingToolbar_Previews: PreviewProvider {
                     onBulletList: { state.hasBulletList.toggle() },
                     onNumberedList: { state.hasNumberedList.toggle() },
                     onCheckboxList: { state.hasCheckbox.toggle() },
-                    onDictation: { isDictating.toggle() }
+                    onDictation: { isDictating.toggle() },
+                    onInsertImage: { print("Insert image") }
                 )
 
                 Spacer()

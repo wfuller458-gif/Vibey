@@ -87,12 +87,22 @@ struct Page: Identifiable, Codable {
 
     // MARK: - RTF Conversion Helpers
 
-    /// Convert RTF data to NSAttributedString
+    /// Convert content data to NSAttributedString
     var attributedString: NSAttributedString {
         if content.isEmpty {
             return NSAttributedString(string: "")
         }
 
+        // Try NSKeyedUnarchiver first (new format with image support)
+        // Use non-secure coding to allow NSTextAttachment, NSImage, etc.
+        if let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: content) {
+            unarchiver.requiresSecureCoding = false
+            if let attrString = unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey) as? NSAttributedString {
+                return attrString
+            }
+        }
+
+        // Fall back to RTF (legacy format)
         if let attrString = NSAttributedString(rtf: content, documentAttributes: nil) {
             return attrString
         }
@@ -107,8 +117,9 @@ struct Page: Identifiable, Codable {
 
     /// Set content from NSAttributedString
     mutating func setAttributedString(_ attrString: NSAttributedString) {
-        if let rtfData = attrString.rtf(from: NSRange(location: 0, length: attrString.length), documentAttributes: [:]) {
-            content = rtfData
+        // Use NSKeyedArchiver to preserve images
+        if let archivedData = try? NSKeyedArchiver.archivedData(withRootObject: attrString, requiringSecureCoding: false) {
+            content = archivedData
         }
     }
 
@@ -116,16 +127,8 @@ struct Page: Identifiable, Codable {
     var plainText: String {
         guard !content.isEmpty else { return "" }
 
-        // Try to extract just the text from RTF
-        var text = ""
-        if let attrString = NSAttributedString(rtf: content, documentAttributes: nil) {
-            text = attrString.string
-        } else if let rawText = String(data: content, encoding: .utf8) {
-            // Fallback to raw UTF8 - but only if it doesn't look like RTF
-            if !rawText.hasPrefix("{\\rtf") {
-                text = rawText
-            }
-        }
+        // Use the attributedString property which handles all formats (archived, RTF, plain text)
+        var text = attributedString.string
 
         // Clean up for terminal - replace bullets, checkboxes, and tabs with plain text equivalents
         text = text.replacingOccurrences(of: "\u{2022}\t", with: "- ")
@@ -151,6 +154,37 @@ struct Page: Identifiable, Codable {
     /// Check if content is empty
     var isEmpty: Bool {
         return content.isEmpty || plainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    // MARK: - Image Extraction
+
+    /// Extract images from content and save to temp files for terminal
+    /// Returns array of file paths to the saved images
+    func extractImagesForTerminal() -> [String] {
+        // Use the attributedString property which handles all formats
+        let attrString = attributedString
+        guard attrString.length > 0 else {
+            return []
+        }
+
+        var imagePaths: [String] = []
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("vibey-images")
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        attrString.enumerateAttribute(.attachment, in: NSRange(location: 0, length: attrString.length)) { value, _, _ in
+            if let attachment = value as? NSTextAttachment,
+               let image = attachment.image {
+                let filename = UUID().uuidString + ".png"
+                let filePath = tempDir.appendingPathComponent(filename)
+                if let tiffData = image.tiffRepresentation,
+                   let bitmap = NSBitmapImageRep(data: tiffData),
+                   let pngData = bitmap.representation(using: .png, properties: [:]) {
+                    try? pngData.write(to: filePath)
+                    imagePaths.append(filePath.path)
+                }
+            }
+        }
+        return imagePaths
     }
 
     // MARK: - Static Helpers
