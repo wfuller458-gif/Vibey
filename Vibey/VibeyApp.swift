@@ -68,6 +68,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             print("🟢 No window found!")
         }
+
+        // Send analytics ping
+        sendAnalyticsPing()
+    }
+
+    private func sendAnalyticsPing() {
+        // Get license key from UserDefaults (or nil for trial users)
+        let licenseKey = UserDefaults.standard.string(forKey: "licenseKey")
+
+        // Get app version
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+
+        // Build request
+        guard let url = URL(string: "https://vibey-backend-production-5589.up.railway.app/ping") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "licenseKey": licenseKey ?? "trial",
+            "appVersion": appVersion
+        ]
+
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        // Fire and forget - don't block app launch
+        URLSession.shared.dataTask(with: request) { _, _, error in
+            if let error = error {
+                print("Analytics ping failed: \(error.localizedDescription)")
+            } else {
+                print("Analytics ping sent successfully")
+            }
+        }.resume()
     }
 }
 
