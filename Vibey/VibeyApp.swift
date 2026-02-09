@@ -74,8 +74,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func sendAnalyticsPing() {
+        // Get or create device ID for tracking
+        let deviceId = getOrCreateDeviceId()
+
         // Get license key from UserDefaults (or nil for trial users)
         let licenseKey = UserDefaults.standard.string(forKey: "licenseKey")
+
+        // Get trial end date
+        let trialEndDate = UserDefaults.standard.object(forKey: "trialEndDate") as? Date
 
         // Get app version
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
@@ -87,10 +93,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = [
-            "licenseKey": licenseKey ?? "trial",
+        var body: [String: Any] = [
+            "deviceId": deviceId,
             "appVersion": appVersion
         ]
+
+        if let licenseKey = licenseKey {
+            body["licenseKey"] = licenseKey
+        }
+
+        if let trialEndDate = trialEndDate {
+            body["trialEndDate"] = Int(trialEndDate.timeIntervalSince1970 * 1000)
+        }
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
@@ -102,6 +116,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 print("Analytics ping sent successfully")
             }
         }.resume()
+    }
+
+    private func getOrCreateDeviceId() -> String {
+        let key = "vibeyDeviceId"
+        if let existingId = UserDefaults.standard.string(forKey: key) {
+            return existingId
+        }
+        let newId = UUID().uuidString
+        UserDefaults.standard.set(newId, forKey: key)
+        return newId
     }
 }
 
