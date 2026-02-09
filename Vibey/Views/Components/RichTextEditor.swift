@@ -364,6 +364,17 @@ class RichNSTextView: NSTextView {
 
     // MARK: - Image Insertion
 
+    /// Default text attributes for the editor
+    private var defaultTextAttributes: [NSAttributedString.Key: Any] {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = 8
+        return [
+            .font: NSFont.systemFont(ofSize: 16),
+            .foregroundColor: NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0),
+            .paragraphStyle: paragraphStyle
+        ]
+    }
+
     /// Insert an image at the current cursor position
     func insertImage(_ image: NSImage, maxWidth: CGFloat = 500) {
         guard let textStorage = textStorage else { return }
@@ -374,13 +385,26 @@ class RichNSTextView: NSTextView {
         let attachment = NSTextAttachment()
         attachment.image = scaledImage
 
-        let attrString = NSAttributedString(attachment: attachment)
+        // Create attributed string with attachment AND our default attributes
+        let attachmentString = NSMutableAttributedString(attachment: attachment)
+        attachmentString.addAttributes(defaultTextAttributes, range: NSRange(location: 0, length: attachmentString.length))
+
+        // Add a newline after the image with default attributes to ensure proper cursor behavior
+        let newlineString = NSAttributedString(string: "\n", attributes: defaultTextAttributes)
+        attachmentString.append(newlineString)
+
+        let insertLocation = selectedRange().location
 
         textStorage.beginEditing()
-        textStorage.replaceCharacters(in: selectedRange(), with: attrString)
+        textStorage.replaceCharacters(in: selectedRange(), with: attachmentString)
         textStorage.endEditing()
 
-        setSelectedRange(NSRange(location: selectedRange().location + 1, length: 0))
+        // Position cursor after the newline
+        setSelectedRange(NSRange(location: insertLocation + 2, length: 0))
+
+        // Reset typing attributes to default so subsequent typing looks correct
+        typingAttributes = defaultTextAttributes
+
         didChangeText()
         onImageInserted?()
     }
