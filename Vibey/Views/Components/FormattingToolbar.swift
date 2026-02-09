@@ -24,8 +24,11 @@ struct FormattingToolbar: View {
     var onCheckboxList: () -> Void
     var onDictation: (() -> Void)? = nil
     var onInsertImage: (() -> Void)? = nil
+    var onLink: ((String?) -> Void)? = nil  // nil to remove link, string to apply/update
+    var currentLinkURL: String? = nil  // Current link URL at cursor (for editing)
 
     @State private var showingColorPicker = false
+    @State private var showingLinkPopover = false
 
     var body: some View {
         HStack(spacing: 4) {
@@ -119,6 +122,41 @@ struct FormattingToolbar: View {
                 onCheckboxList()
             }
 
+            // Link button
+            if let onLink = onLink {
+                Divider()
+                    .frame(height: 20)
+                    .padding(.horizontal, 4)
+
+                Button(action: {
+                    showingLinkPopover.toggle()
+                }) {
+                    Image(systemName: "link")
+                        .font(.system(size: 14, weight: currentLinkURL != nil ? .bold : .regular))
+                        .foregroundColor(currentLinkURL != nil ? .vibeyBlue : .white)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(currentLinkURL != nil ? Color.vibeyBlue.opacity(0.2) : (showingLinkPopover ? Color.white.opacity(0.1) : Color.clear))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Add or edit link")
+                .popover(isPresented: $showingLinkPopover, arrowEdge: .bottom) {
+                    LinkPopover(
+                        currentURL: currentLinkURL,
+                        onApply: { url in
+                            onLink(url)
+                            showingLinkPopover = false
+                        },
+                        onRemove: {
+                            onLink(nil)
+                            showingLinkPopover = false
+                        }
+                    )
+                }
+            }
+
             // Insert image button
             if let onInsertImage = onInsertImage {
                 Divider()
@@ -205,6 +243,83 @@ struct FormatButton: View {
     }
 }
 
+// MARK: - Link Popover
+
+struct LinkPopover: View {
+    let currentURL: String?
+    let onApply: (String) -> Void
+    let onRemove: () -> Void
+
+    @State private var urlText: String = ""
+    @FocusState private var isTextFieldFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(currentURL != nil ? "Edit Link" : "Add Link")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+
+            TextField("https://example.com", text: $urlText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14))
+                .foregroundColor(.white)
+                .padding(8)
+                .background(Color(hex: "2A2D32"))
+                .cornerRadius(6)
+                .focused($isTextFieldFocused)
+                .onSubmit {
+                    if !urlText.isEmpty {
+                        onApply(urlText)
+                    }
+                }
+
+            HStack(spacing: 8) {
+                if currentURL != nil {
+                    Button("Remove") {
+                        onRemove()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.red.opacity(0.2))
+                    .cornerRadius(4)
+                }
+
+                Spacer()
+
+                Button("Cancel") {
+                    // Just close - handled by popover dismissal
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.white.opacity(0.7))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+
+                Button("Apply") {
+                    if !urlText.isEmpty {
+                        onApply(urlText)
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.vibeyBlue)
+                .cornerRadius(4)
+                .disabled(urlText.isEmpty)
+            }
+        }
+        .padding(16)
+        .frame(width: 300)
+        .background(Color(hex: "1C1E22"))
+        .onAppear {
+            urlText = currentURL ?? ""
+            isTextFieldFocused = true
+        }
+    }
+}
+
 // MARK: - Color Picker Popover
 
 struct ColorPickerPopover: View {
@@ -280,7 +395,8 @@ struct FormattingToolbar_Previews: PreviewProvider {
                     onNumberedList: { state.hasNumberedList.toggle() },
                     onCheckboxList: { state.hasCheckbox.toggle() },
                     onDictation: { isDictating.toggle() },
-                    onInsertImage: { print("Insert image") }
+                    onInsertImage: { print("Insert image") },
+                    onLink: { url in print("Link: \(url ?? "removed")") }
                 )
 
                 Spacer()

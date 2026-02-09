@@ -490,7 +490,9 @@ struct PageEditorPanel: View {
                         onNumberedList: { applyNumberedList() },
                         onCheckboxList: { applyCheckboxList() },
                         onDictation: { applyDictation() },
-                        onInsertImage: { insertImageFromPicker() }
+                        onInsertImage: { insertImageFromPicker() },
+                        onLink: { urlString in applyLink(urlString) },
+                        currentLinkURL: selectionState.linkURL
                     )
                     .fixedSize()
                     .position(toolbarPosition)
@@ -571,6 +573,16 @@ struct PageEditorPanel: View {
                     richTextView?.insertImage(image)
                 }
             }
+        }
+    }
+
+    private func applyLink(_ urlString: String?) {
+        if let urlString = urlString {
+            // Apply or update link
+            richTextView?.applyLink(urlString)
+        } else {
+            // Remove link
+            richTextView?.removeLink()
         }
     }
 
@@ -968,6 +980,15 @@ struct RichTextEditorWithRef: NSViewRepresentable {
 
             if let color = attrs[.foregroundColor] as? NSColor {
                 state.textColor = color
+            }
+
+            // Check for link
+            if let link = attrs[.link] {
+                if let url = link as? URL {
+                    state.linkURL = url.absoluteString
+                } else if let urlString = link as? String {
+                    state.linkURL = urlString
+                }
             }
 
             return state

@@ -22,6 +22,7 @@ struct TextSelectionState: Equatable {
     var hasBulletList: Bool = false
     var hasNumberedList: Bool = false
     var hasCheckbox: Bool = false
+    var linkURL: String? = nil  // URL if cursor is in a link, nil otherwise
 }
 
 // MARK: - Rich Text Editor
@@ -320,6 +321,15 @@ struct RichTextEditor: NSViewRepresentable {
 
             if let color = attrs[.foregroundColor] as? NSColor {
                 state.textColor = color
+            }
+
+            // Check for link
+            if let link = attrs[.link] {
+                if let url = link as? URL {
+                    state.linkURL = url.absoluteString
+                } else if let urlString = link as? String {
+                    state.linkURL = urlString
+                }
             }
 
             return state
@@ -1436,9 +1446,116 @@ class RichNSTextView: NSTextView {
         }
     }
 
-    // MARK: - Paste (Images and Plain Text)
+    // MARK: - URL/Link Support
 
-    /// Override paste to handle images and strip formatting from text
+    /// Check if a string is a valid URL
+    private func isValidURL(_ string: String) -> Bool {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Check for common URL patterns
+        let urlPattern = "^(https?://|www\\.)[^\\s]+$"
+        if let regex = try? NSRegularExpression(pattern: urlPattern, options: .caseInsensitive) {
+            let range = NSRange(trimmed.startIndex..., in: trimmed)
+            return regex.firstMatch(in: trimmed, range: range) != nil
+        }
+        return false
+    }
+
+    /// Convert string to URL, adding https:// if needed
+    private func urlFromString(_ string: String) -> URL? {
+        var urlString = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if urlString.lowercased().hasPrefix("www.") {
+            urlString = "https://" + urlString
+        }
+        return URL(string: urlString)
+    }
+
+    /// Apply a hyperlink to the selected text
+    func applyLink(_ urlString: String) {
+        guard let textStorage = textStorage else { return }
+        let range = selectedRange()
+
+        guard range.length > 0 else { return }
+        guard let url = urlFromString(urlString) else { return }
+
+        textStorage.beginEditing()
+        textStorage.addAttribute(.link, value: url, range: range)
+        // Style links with blue color and underline
+        textStorage.addAttribute(.foregroundColor, value: NSColor(red: 99/255, green: 179/255, blue: 237/255, alpha: 1.0), range: range)
+        textStorage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
+        textStorage.endEditing()
+
+        didChangeText()
+    }
+
+    /// Remove hyperlink from selected text
+    func removeLink() {
+        guard let textStorage = textStorage else { return }
+        let range = selectedRange()
+
+        guard range.length > 0 else { return }
+
+        textStorage.beginEditing()
+        textStorage.removeAttribute(.link, range: range)
+        // Reset to default text color
+        textStorage.addAttribute(.foregroundColor, value: NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0), range: range)
+        textStorage.removeAttribute(.underlineStyle, range: range)
+        textStorage.endEditing()
+
+        didChangeText()
+    }
+
+    /// Insert a URL as a clickable link with the URL as display text
+    func insertLinkWithURL(_ urlString: String) {
+        guard let textStorage = textStorage else { return }
+        guard let url = urlFromString(urlString) else { return }
+
+        let displayText = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let linkAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 16),
+            .foregroundColor: NSColor(red: 99/255, green: 179/255, blue: 237/255, alpha: 1.0),
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .link: url
+        ]
+
+        let linkString = NSAttributedString(string: displayText, attributes: linkAttributes)
+        let insertLocation = selectedRange()
+
+        textStorage.beginEditing()
+        textStorage.replaceCharacters(in: insertLocation, with: linkString)
+        textStorage.endEditing()
+
+        setSelectedRange(NSRange(location: insertLocation.location + displayText.count, length: 0))
+        typingAttributes = defaultTextAttributes
+        didChangeText()
+    }
+
+    /// Get the URL at the current cursor position (for editing existing links)
+    func getLinkAtCursor() -> String? {
+        guard let textStorage = textStorage else { return nil }
+        let cursorPos = selectedRange().location
+
+        guard cursorPos < textStorage.length else { return nil }
+
+        let attrs = textStorage.attributes(at: cursorPos, effectiveRange: nil)
+        if let link = attrs[.link] {
+            if let url = link as? URL {
+                return url.absoluteString
+            } else if let urlString = link as? String {
+                return urlString
+            }
+        }
+        return nil
+    }
+
+    /// Check if current selection or cursor is in a link
+    func hasLinkAtSelection() -> Bool {
+        return getLinkAtCursor() != nil
+    }
+
+    // MARK: - Paste (Images, URLs, and Plain Text)
+
+    /// Override paste to handle images, URLs, and strip formatting from text
     override func paste(_ sender: Any?) {
         let pasteboard = NSPasteboard.general
 
@@ -1461,24 +1578,26 @@ class RichNSTextView: NSTextView {
             }
         }
 
-        // Fall back to plain text paste
+        // Get plain text from pasteboard
         guard let plainText = pasteboard.string(forType: .string), !plainText.isEmpty else {
             return
         }
 
-        // Build default attributes matching the app's text style
-        let defaultFont = NSFont.systemFont(ofSize: 16)
-        let defaultColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0) // vibeyText
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = 8
+        // Check if pasting a URL
+        if isValidURL(plainText) {
+            let range = selectedRange()
+            if range.length > 0 {
+                // Text is selected - apply link to selected text
+                applyLink(plainText)
+            } else {
+                // No selection - insert URL as clickable link
+                insertLinkWithURL(plainText)
+            }
+            return
+        }
 
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: defaultFont,
-            .foregroundColor: defaultColor,
-            .paragraphStyle: paragraphStyle
-        ]
-
-        let attributedText = NSAttributedString(string: plainText, attributes: attributes)
+        // Fall back to plain text paste
+        let attributedText = NSAttributedString(string: plainText, attributes: defaultTextAttributes)
 
         // Insert at current selection (replacing any selected text)
         guard let textStorage = textStorage else { return }
