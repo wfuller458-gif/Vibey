@@ -492,6 +492,7 @@ struct PageEditorPanel: View {
                         onDictation: { applyDictation() },
                         onInsertImage: { insertImageFromPicker() },
                         onLink: { urlString in applyLink(urlString) },
+                        onConvertToEmbed: { urlString in convertLinkToEmbed(urlString) },
                         currentLinkURL: selectionState.linkURL
                     )
                     .fixedSize()
@@ -499,6 +500,7 @@ struct PageEditorPanel: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     .animation(.easeOut(duration: 0.15), value: showFloatingToolbar)
                 }
+
             }
         }
         .background(Color.vibeyBackground)
@@ -584,6 +586,28 @@ struct PageEditorPanel: View {
             // Remove link
             richTextView?.removeLink()
         }
+    }
+
+    private func convertLinkToEmbed(_ urlString: String) {
+        guard let textView = richTextView, let textStorage = textView.textStorage else { return }
+
+        // First select the full link range (in case cursor is just positioned in the link)
+        textView.selectLinkAtCursor()
+
+        // Get the selected range (now the full link)
+        let range = textView.selectedRange()
+
+        if range.length > 0 {
+            // Delete the link text
+            textStorage.beginEditing()
+            textStorage.deleteCharacters(in: range)
+            textStorage.endEditing()
+            textView.setSelectedRange(NSRange(location: range.location, length: 0))
+            textView.didChangeText()
+        }
+
+        // Insert the preview card at current position
+        textView.insertLinkPreviewCard(urlString: urlString)
     }
 
     // MARK: - Status Properties

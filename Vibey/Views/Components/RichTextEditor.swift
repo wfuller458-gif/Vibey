@@ -1553,6 +1553,93 @@ class RichNSTextView: NSTextView {
         return getLinkAtCursor() != nil
     }
 
+    /// Get the full range of the link at the cursor position
+    func getLinkRangeAtCursor() -> NSRange? {
+        guard let textStorage = textStorage else { return nil }
+        let cursorPos = selectedRange().location
+
+        guard cursorPos < textStorage.length else { return nil }
+
+        var effectiveRange = NSRange(location: 0, length: 0)
+        let link = textStorage.attribute(.link, at: cursorPos, effectiveRange: &effectiveRange)
+
+        if link != nil && effectiveRange.length > 0 {
+            return effectiveRange
+        }
+        return nil
+    }
+
+    /// Select the full link at the cursor position
+    func selectLinkAtCursor() {
+        if let linkRange = getLinkRangeAtCursor() {
+            setSelectedRange(linkRange)
+        }
+    }
+
+    /// Insert a link preview card
+    func insertLinkPreviewCard(urlString: String) {
+        // Fetch preview data and insert card
+        LinkPreviewService.shared.fetchPreview(for: urlString) { [weak self] preview in
+            guard let self = self, let preview = preview else {
+                // Fallback to text link if fetch fails
+                self?.insertLinkWithURL(urlString)
+                return
+            }
+
+            // If there's an image URL, fetch the thumbnail
+            if let imageURL = preview.imageURL {
+                LinkPreviewService.shared.fetchImage(from: imageURL) { [weak self] thumbnail in
+                    self?.insertPreviewCardImage(preview: preview, thumbnail: thumbnail)
+                }
+            } else {
+                self.insertPreviewCardImage(preview: preview, thumbnail: nil)
+            }
+        }
+    }
+
+    /// Insert the rendered preview card as an image
+    private func insertPreviewCardImage(preview: LinkPreviewData, thumbnail: NSImage?) {
+        guard let textStorage = textStorage else { return }
+
+        // Render the preview card to an image
+        let cardImage = LinkPreviewCardRenderer.renderToImageBitmap(
+            preview: preview,
+            thumbnail: thumbnail,
+            maxWidth: 400
+        ) ?? LinkPreviewCardRenderer.renderToImage(
+            preview: preview,
+            thumbnail: thumbnail,
+            maxWidth: 400
+        )
+
+        // Create attachment with the card image
+        let attachment = NSTextAttachment()
+        attachment.image = cardImage
+
+        // Create attributed string with the attachment
+        let attachmentString = NSMutableAttributedString(attachment: attachment)
+
+        // Store the URL as a custom attribute so it's clickable
+        attachmentString.addAttribute(.link, value: URL(string: preview.url) ?? preview.url, range: NSRange(location: 0, length: attachmentString.length))
+
+        // Also store the preview data for potential future editing
+        attachmentString.addAttribute(.init("linkPreviewData"), value: preview.url, range: NSRange(location: 0, length: attachmentString.length))
+
+        // Add newline after for proper spacing
+        let newlineString = NSAttributedString(string: "\n", attributes: defaultTextAttributes)
+
+        let insertLocation = selectedRange()
+
+        textStorage.beginEditing()
+        textStorage.replaceCharacters(in: insertLocation, with: attachmentString)
+        textStorage.insert(newlineString, at: insertLocation.location + 1)
+        textStorage.endEditing()
+
+        setSelectedRange(NSRange(location: insertLocation.location + 2, length: 0))
+        typingAttributes = defaultTextAttributes
+        didChangeText()
+    }
+
     // MARK: - Paste (Images, URLs, and Plain Text)
 
     /// Override paste to handle images, URLs, and strip formatting from text
@@ -1589,10 +1676,11 @@ class RichNSTextView: NSTextView {
             if range.length > 0 {
                 // Text is selected - apply link to selected text
                 applyLink(plainText)
-            } else {
-                // No selection - insert URL as clickable link
-                insertLinkWithURL(plainText)
+                return
             }
+
+            // No selection - insert as text link (can convert to embed via Edit Link popup)
+            insertLinkWithURL(plainText)
             return
         }
 

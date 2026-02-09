@@ -25,6 +25,7 @@ struct FormattingToolbar: View {
     var onDictation: (() -> Void)? = nil
     var onInsertImage: (() -> Void)? = nil
     var onLink: ((String?) -> Void)? = nil  // nil to remove link, string to apply/update
+    var onConvertToEmbed: ((String) -> Void)? = nil  // Convert current link to embed card
     var currentLinkURL: String? = nil  // Current link URL at cursor (for editing)
 
     @State private var showingColorPicker = false
@@ -152,7 +153,11 @@ struct FormattingToolbar: View {
                         onRemove: {
                             onLink(nil)
                             showingLinkPopover = false
-                        }
+                        },
+                        onConvertToEmbed: currentLinkURL != nil ? { url in
+                            onConvertToEmbed?(url)
+                            showingLinkPopover = false
+                        } : nil
                     )
                 }
             }
@@ -249,6 +254,7 @@ struct LinkPopover: View {
     let currentURL: String?
     let onApply: (String) -> Void
     let onRemove: () -> Void
+    var onConvertToEmbed: ((String) -> Void)? = nil  // Only available when editing existing link
 
     @State private var urlText: String = ""
     @FocusState private var isTextFieldFocused: Bool
@@ -272,6 +278,59 @@ struct LinkPopover: View {
                         onApply(urlText)
                     }
                 }
+
+            // Display format option (only when editing existing link)
+            if currentURL != nil, let onConvertToEmbed = onConvertToEmbed {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Display as:")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.7))
+
+                    HStack(spacing: 8) {
+                        // URL option (current state)
+                        Button(action: {}) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "link")
+                                    .font(.system(size: 12))
+                                Text("URL")
+                                    .font(.system(size: 12))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.vibeyBlue.opacity(0.3))
+                            .foregroundColor(.vibeyBlue)
+                            .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.vibeyBlue, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        // Embed option
+                        Button(action: {
+                            if !urlText.isEmpty {
+                                onConvertToEmbed(urlText)
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "rectangle.and.text.magnifyingglass")
+                                    .font(.system(size: 12))
+                                Text("Embed")
+                                    .font(.system(size: 12))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.1))
+                            .foregroundColor(.white.opacity(0.8))
+                            .cornerRadius(4)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Convert to rich preview card with thumbnail")
+                    }
+                }
+                .padding(.top, 4)
+            }
 
             HStack(spacing: 8) {
                 if currentURL != nil {

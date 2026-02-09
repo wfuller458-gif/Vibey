@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4FD405CA8230E70F7E1445F2 /* LinkPreviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEB03E2BFA18201CB2C1CE30 /* LinkPreviewCard.swift */; };
 		5F5ED9CE2F1772900097781C /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 5F5ED9CD2F1772900097781C /* SwiftTerm */; };
+		80BEDD56B5FC78A0A5ACD95C /* LinkPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95721BBF1F34747E7197430A /* LinkPreview.swift */; };
 		AA0001 /* VibeyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000 /* VibeyApp.swift */; };
 		AA0003 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0002 /* AppState.swift */; };
 		AA0005 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0004 /* Project.swift */; };
@@ -35,6 +37,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		95721BBF1F34747E7197430A /* LinkPreview.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LinkPreview.swift; sourceTree = "<group>"; };
 		AA0000 /* VibeyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeyApp.swift; sourceTree = "<group>"; };
 		AA0002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		AA0004 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
@@ -57,6 +60,7 @@
 		AA0052 /* SpeechRecognitionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognitionManager.swift; sourceTree = "<group>"; };
 		AA0054 /* TerminalMessageEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalMessageEditor.swift; sourceTree = "<group>"; };
 		AAAAAA /* Vibey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vibey.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FEB03E2BFA18201CB2C1CE30 /* LinkPreviewCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LinkPreviewCard.swift; sourceTree = "<group>"; };
 		FFATKBLD01 /* AtkinsonHyperlegible-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "AtkinsonHyperlegible-Bold.ttf"; path = "Vibey/Fonts/Atkinson_Hyperlegible/AtkinsonHyperlegible-Bold.ttf"; sourceTree = "<group>"; };
 		FFATKRG01 /* AtkinsonHyperlegible-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "AtkinsonHyperlegible-Regular.ttf"; path = "Vibey/Fonts/Atkinson_Hyperlegible/AtkinsonHyperlegible-Regular.ttf"; sourceTree = "<group>"; };
 		FFLEXBLD01 /* Lexend-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Lexend-Bold.ttf"; path = "Vibey/Fonts/Lexend/static/Lexend-Bold.ttf"; sourceTree = "<group>"; };
@@ -125,6 +129,7 @@
 				AA0004 /* Project.swift */,
 				AA0006 /* Page.swift */,
 				AA0008 /* Prompt.swift */,
+				95721BBF1F34747E7197430A /* LinkPreview.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -181,6 +186,7 @@
 				AA0012 /* VibeyLogo.swift */,
 				AA0048 /* RichTextEditor.swift */,
 				AA0049 /* FormattingToolbar.swift */,
+				FEB03E2BFA18201CB2C1CE30 /* LinkPreviewCard.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -284,6 +290,8 @@
 				AA0050 /* RichTextEditor.swift in Sources */,
 				AA0051 /* FormattingToolbar.swift in Sources */,
 				AA0053 /* SpeechRecognitionManager.swift in Sources */,
+				80BEDD56B5FC78A0A5ACD95C /* LinkPreview.swift in Sources */,
+				4FD405CA8230E70F7E1445F2 /* LinkPreviewCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
