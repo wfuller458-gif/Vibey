@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AppKit
+import AVFoundation
 
 // MARK: - Selection State
 
@@ -255,6 +256,8 @@ struct RichTextEditor: NSViewRepresentable {
                 textView.applyNumberedList()
             }
         }
+
+        // Note: Paragraph styles for auto-converted lists are applied by applyBulletList/applyNumberedList
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView = notification.object as? RichNSTextView else { return }
@@ -895,6 +898,12 @@ class RichNSTextView: NSTextView {
             textStorage.beginEditing()
             textStorage.deleteCharacters(in: paragraphRange)
             textStorage.endEditing()
+
+            // Reset typing attributes paragraph style to default
+            var attrs = typingAttributes
+            attrs[.paragraphStyle] = defaultParagraphStyle()
+            typingAttributes = attrs
+
             didChangeText()
             notifyTypingAttributesChanged()
             return true
@@ -918,7 +927,8 @@ class RichNSTextView: NSTextView {
 
         let markerAttrs: [NSAttributedString.Key: Any] = [
             .font: markerFont,
-            .foregroundColor: textColor
+            .foregroundColor: textColor,
+            .paragraphStyle: listParagraphStyle()
         ]
         let attrMarker = NSAttributedString(string: newMarker, attributes: markerAttrs)
 
@@ -962,7 +972,17 @@ class RichNSTextView: NSTextView {
             // Cursor is right after marker - remove the marker
             textStorage.beginEditing()
             textStorage.deleteCharacters(in: NSRange(location: paragraphRange.location, length: markerLength))
+            // Reset paragraph style to default on remaining content
+            let remainingLength = paragraphRange.length - markerLength
+            if remainingLength > 0 {
+                textStorage.addAttribute(.paragraphStyle, value: defaultParagraphStyle(), range: NSRange(location: paragraphRange.location, length: remainingLength))
+            }
             textStorage.endEditing()
+
+            // Reset typing attributes paragraph style to default
+            var attrs = typingAttributes
+            attrs[.paragraphStyle] = defaultParagraphStyle()
+            typingAttributes = attrs
 
             // Position cursor at start of line
             setSelectedRange(NSRange(location: paragraphRange.location, length: 0))
@@ -1219,6 +1239,36 @@ class RichNSTextView: NSTextView {
         case checkbox
     }
 
+    /// Fixed line height for all text (body font ascender + descender + line spacing)
+    private static let fixedLineHeight: CGFloat = {
+        let font = NSFont.systemFont(ofSize: 16)
+        return ceil(font.ascender - font.descender + font.leading) + 8 // 8 = lineSpacing
+    }()
+
+    /// Create a paragraph style for list items with proper hanging indent
+    private func listParagraphStyle() -> NSMutableParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = 8
+        let indentWidth: CGFloat = 20
+        style.headIndent = indentWidth
+        style.firstLineHeadIndent = 0
+        style.tabStops = [NSTextTab(textAlignment: .left, location: indentWidth)]
+        style.defaultTabInterval = indentWidth
+        // Lock line height so checkbox/bullet characters can't shift it
+        style.minimumLineHeight = RichNSTextView.fixedLineHeight
+        style.maximumLineHeight = RichNSTextView.fixedLineHeight
+        return style
+    }
+
+    /// The default (non-list) paragraph style
+    private func defaultParagraphStyle() -> NSMutableParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = 8
+        style.minimumLineHeight = RichNSTextView.fixedLineHeight
+        style.maximumLineHeight = RichNSTextView.fixedLineHeight
+        return style
+    }
+
     private func applyList(type: ListType) {
         guard let textStorage = textStorage else { return }
 
@@ -1250,13 +1300,19 @@ class RichNSTextView: NSTextView {
             let marker = markerFor(type)
             let markerAttrs: [NSAttributedString.Key: Any] = [
                 .font: markerFont,
-                .foregroundColor: textColor
+                .foregroundColor: textColor,
+                .paragraphStyle: listParagraphStyle()
             ]
             let attrMarker = NSAttributedString(string: marker, attributes: markerAttrs)
 
             textStorage.beginEditing()
             textStorage.insert(attrMarker, at: selectedRange.location)
             textStorage.endEditing()
+
+            // Set typing attributes to include list paragraph style
+            var attrs = typingAttributes
+            attrs[.paragraphStyle] = listParagraphStyle()
+            typingAttributes = attrs
 
             // Move cursor after marker
             setSelectedRange(NSRange(location: selectedRange.location + marker.count, length: 0))
@@ -1319,6 +1375,11 @@ class RichNSTextView: NSTextView {
                         }
                     }
                     textStorage.deleteCharacters(in: NSRange(location: paraRange.location, length: markerLen))
+                    // Reset paragraph style to default (remove hanging indent)
+                    let remainingLength = paraRange.length - markerLen
+                    if remainingLength > 0 {
+                        textStorage.addAttribute(.paragraphStyle, value: defaultParagraphStyle(), range: NSRange(location: paraRange.location, length: remainingLength))
+                    }
                 }
             } else {
                 // Remove existing marker if switching type
@@ -1340,10 +1401,16 @@ class RichNSTextView: NSTextView {
                 let marker = markerFor(type, number: listNumber)
                 let markerAttrs: [NSAttributedString.Key: Any] = [
                     .font: markerFont,
-                    .foregroundColor: textColor
+                    .foregroundColor: textColor,
+                    .paragraphStyle: listParagraphStyle()
                 ]
                 let attrMarker = NSAttributedString(string: marker, attributes: markerAttrs)
                 textStorage.insert(attrMarker, at: paraRange.location)
+                // Apply list paragraph style to the entire paragraph
+                let newParaLength = paraRange.length - (hasBullet || hasNumber || hasCheckbox ? markerLen : 0) + marker.count
+                if newParaLength > 0 {
+                    textStorage.addAttribute(.paragraphStyle, value: listParagraphStyle(), range: NSRange(location: paraRange.location, length: newParaLength))
+                }
             }
 
             listNumber -= 1
@@ -1367,14 +1434,16 @@ class RichNSTextView: NSTextView {
         // Text color for markers
         let textColor = NSColor(red: 235/255, green: 236/255, blue: 240/255, alpha: 1.0)
         let markerFont = NSFont.systemFont(ofSize: 16)
+        let paraStyle = listParagraphStyle()
 
         textStorage.beginEditing()
 
         if lineContent.hasPrefix("☐") {
-            // Check it - replace with checked box and add strikethrough
+            // Check it - swap checkbox character only (keep same length)
             let markerAttrs: [NSAttributedString.Key: Any] = [
                 .font: markerFont,
-                .foregroundColor: textColor
+                .foregroundColor: textColor,
+                .paragraphStyle: paraStyle
             ]
             let checkedMarker = NSAttributedString(string: "☑", attributes: markerAttrs)
             textStorage.replaceCharacters(in: NSRange(location: paragraphRange.location, length: 1), with: checkedMarker)
@@ -1396,10 +1465,11 @@ class RichNSTextView: NSTextView {
                 }
             }
         } else if lineContent.hasPrefix("☑") {
-            // Uncheck it - replace with unchecked box and remove strikethrough
+            // Uncheck it - swap checkbox character only (keep same length)
             let markerAttrs: [NSAttributedString.Key: Any] = [
                 .font: markerFont,
-                .foregroundColor: textColor
+                .foregroundColor: textColor,
+                .paragraphStyle: paraStyle
             ]
             let uncheckedMarker = NSAttributedString(string: "☐", attributes: markerAttrs)
             textStorage.replaceCharacters(in: NSRange(location: paragraphRange.location, length: 1), with: uncheckedMarker)
@@ -1412,6 +1482,11 @@ class RichNSTextView: NSTextView {
                 textStorage.removeAttribute(.strikethroughStyle, range: contentRange)
             }
         }
+
+        // Apply uniform paragraph style to the entire paragraph to prevent layout shift
+        textStorage.addAttribute(.paragraphStyle, value: paraStyle, range: paragraphRange)
+        // Ensure uniform font on the marker+tab portion to prevent metric differences
+        textStorage.addAttribute(.font, value: markerFont, range: NSRange(location: paragraphRange.location, length: min(2, paragraphRange.length)))
 
         textStorage.endEditing()
         didChangeText()
@@ -1464,7 +1539,25 @@ class RichNSTextView: NSTextView {
         if isDictating {
             stopSystemDictation()
         } else {
-            startSystemDictation()
+            // Check mic permission upfront before starting dictation
+            switch AVCaptureDevice.authorizationStatus(for: .audio) {
+            case .authorized:
+                startSystemDictation()
+            case .notDetermined:
+                AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                    DispatchQueue.main.async {
+                        if granted {
+                            self?.startSystemDictation()
+                        }
+                    }
+                }
+            case .denied, .restricted:
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                    NSWorkspace.shared.open(url)
+                }
+            @unknown default:
+                break
+            }
         }
     }
 
@@ -1783,10 +1876,14 @@ class RichNSTextView: NSTextView {
 
                 // Check if clicking on or near the checkbox character
                 if lineStart == "☐" || lineStart == "☑" {
-                    // Calculate if click is within the checkbox area (first ~20 pixels)
+                    // Calculate if click is within the checkbox area
                     if let layoutManager = layoutManager, let textContainer = textContainer {
                         let glyphRange = layoutManager.glyphRange(forCharacterRange: NSRange(location: paragraphRange.location, length: 1), actualCharacterRange: nil)
-                        let checkboxRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+                        var checkboxRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+
+                        // Offset by textContainerOrigin so rect is in view coordinates
+                        checkboxRect.origin.x += textContainerOrigin.x
+                        checkboxRect.origin.y += textContainerOrigin.y
 
                         // Expand hit area slightly for easier clicking
                         let hitArea = checkboxRect.insetBy(dx: -5, dy: -5)

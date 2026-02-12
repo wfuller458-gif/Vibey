@@ -34,6 +34,13 @@ struct ValidationResponse: Codable {
     let reason: String?
 }
 
+// MARK: - Version Response
+
+struct VersionResponse: Codable {
+    let version: String
+    let downloadURL: String
+}
+
 // Observable object that can be accessed throughout the app via @EnvironmentObject
 class AppState: ObservableObject {
     // MARK: - Published Properties
@@ -77,9 +84,83 @@ class AppState: ObservableObject {
     // Track if user ever had a paid subscription (for showing correct expired popup)
     @Published var hadPaidSubscription: Bool = false
 
+    // MARK: - Update Properties
+
+    // Whether a new version is available
+    @Published var updateAvailable: Bool = false
+
+    // Latest version string from server
+    @Published var latestVersion: String?
+
     // Comic Sans mode - activated after first trial expires
     var isComicSansMode: Bool {
         return subscriptionStatus == .comicSansTrial
+    }
+
+    // MARK: - Usage Tracking
+
+    /// Timer for debouncing usage pings
+    private var usagePingTimer: Timer?
+
+    /// Last time a usage ping was sent (debounce to max once per 5 minutes)
+    private var lastUsagePingTime: Date?
+
+    /// Call this on user interactions (typing, sending, focusing) to track active usage.
+    /// Debounced so events aren't fired excessively.
+    func trackUsage() {
+        let debounceInterval: TimeInterval = 300 // 5 minutes
+
+        // Skip if we pinged recently
+        if let lastPing = lastUsagePingTime, Date().timeIntervalSince(lastPing) < debounceInterval {
+            // Reset the timer so continued activity extends the window
+            usagePingTimer?.invalidate()
+            usagePingTimer = Timer.scheduledTimer(withTimeInterval: debounceInterval, repeats: false) { [weak self] _ in
+                self?.sendUsagePing()
+            }
+            return
+        }
+
+        // Fire immediately on first interaction, then debounce
+        sendUsagePing()
+    }
+
+    private func sendUsagePing() {
+        lastUsagePingTime = Date()
+        usagePingTimer?.invalidate()
+        usagePingTimer = nil
+
+        let deviceId = getOrCreateDeviceId()
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+
+        guard let url = URL(string: "https://vibey-backend-production-5589.up.railway.app/ping") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = [
+            "deviceId": deviceId,
+            "appVersion": appVersion,
+            "event": "usage"
+        ]
+
+        if let key = licenseKey {
+            body["licenseKey"] = key
+        }
+
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
+    }
+
+    private func getOrCreateDeviceId() -> String {
+        let key = "vibeyDeviceId"
+        if let existingId = UserDefaults.standard.string(forKey: key) {
+            return existingId
+        }
+        let newId = UUID().uuidString
+        UserDefaults.standard.set(newId, forKey: key)
+        return newId
     }
 
     // MARK: - Initialization
@@ -92,6 +173,9 @@ class AppState: ObservableObject {
         Task {
             await checkSubscriptionStatus()
         }
+
+        // Check for updates on launch
+        checkForUpdates()
     }
 
     // MARK: - State Management
@@ -515,5 +599,29 @@ class AppState: ObservableObject {
         if let url = URL(string: "https://www.vibey.codes/upgrade") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    // MARK: - Update Methods
+
+    func checkForUpdates() {
+        guard let url = URL(string: "https://vibey.codes/version.json") else { return }
+
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data,
+                  let response = try? JSONDecoder().decode(VersionResponse.self, from: data),
+                  let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            else { return }
+
+            DispatchQueue.main.async {
+                if self.isNewerVersion(response.version, than: currentVersion) {
+                    self.updateAvailable = true
+                    self.latestVersion = response.version
+                }
+            }
+        }.resume()
+    }
+
+    private func isNewerVersion(_ remote: String, than local: String) -> Bool {
+        return remote.compare(local, options: .numeric) == .orderedDescending
     }
 }

@@ -15,11 +15,9 @@ class WindowDelegate: NSObject, NSWindowDelegate {
     weak var appState: AppState?
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        print("🔴 windowShouldClose called")
-
         let alert = NSAlert()
         alert.messageText = "Close Vibey?"
-        alert.informativeText = "All terminal history will be deleted for all projects. This action cannot be undone."
+        alert.informativeText = "Your pages and projects are saved. Terminal session data will be lost when you close the app."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Close")
         alert.addButton(withTitle: "Cancel")
@@ -27,21 +25,15 @@ class WindowDelegate: NSObject, NSWindowDelegate {
         let response = alert.runModal()
 
         if response == .alertFirstButtonReturn {
-            print("🔴 User clicked Close")
             // User clicked "Close" - clear all page statuses before closing
             if let appState = appState {
-                print("🔴 AppState found, clearing \(appState.projects.count) projects")
                 for project in appState.projects {
-                    print("🔴 Clearing statuses for project: \(project.name)")
                     appState.clearAllPageStatuses(for: project.id)
                 }
-            } else {
-                print("🔴 AppState is nil!")
             }
 
             // Force UserDefaults to save immediately before terminating
             UserDefaults.standard.synchronize()
-            print("🔴 UserDefaults synchronized")
 
             // Terminate the app
             NSApplication.shared.terminate(nil)
@@ -53,22 +45,34 @@ class WindowDelegate: NSObject, NSWindowDelegate {
     }
 }
 
+// MARK: - Window Accessor (sets NSWindowDelegate from SwiftUI)
+struct WindowAccessor: NSViewRepresentable {
+    let windowDelegate: WindowDelegate
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                window.delegate = windowDelegate
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        // Re-set delegate in case SwiftUI replaced it
+        if let window = nsView.window, window.delegate !== windowDelegate {
+            window.delegate = windowDelegate
+        }
+    }
+}
+
 // MARK: - App Delegate
 class AppDelegate: NSObject, NSApplicationDelegate {
     var windowDelegate = WindowDelegate()
     weak var appState: AppState?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Set delegate on the main window to intercept close events
-        print("🟢 applicationDidFinishLaunching - windows count: \(NSApplication.shared.windows.count)")
-        if let window = NSApplication.shared.windows.first {
-            windowDelegate.appState = appState
-            window.delegate = windowDelegate
-            print("🟢 Window delegate set, appState is \(appState == nil ? "nil" : "set")")
-        } else {
-            print("🟢 No window found!")
-        }
-
         // Send analytics ping
         sendAnalyticsPing()
     }
@@ -178,26 +182,33 @@ struct VibeyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ZStack {
-                // Keep main app always rendered (keeps terminal alive)
-                MainContentView()
-                    .environmentObject(appState)
-                    .environment(\.showingProjectsList, $showingProjectsList)
-                    .environment(\.isComicSansMode, appState.isComicSansMode)
+            VStack(spacing: 0) {
+                // Update banner - full width yellow
+                if appState.updateAvailable {
+                    UpdateBanner(version: appState.latestVersion ?? "")
+                }
 
-                // Show projects list on top when needed
-                if showingProjectsList || appState.currentProject == nil {
-                    ProjectsListView()
+                ZStack {
+                    // Keep main app always rendered (keeps terminal alive)
+                    MainContentView()
                         .environmentObject(appState)
                         .environment(\.showingProjectsList, $showingProjectsList)
                         .environment(\.isComicSansMode, appState.isComicSansMode)
+
+                    // Show projects list on top when needed
+                    if showingProjectsList || appState.currentProject == nil {
+                        ProjectsListView()
+                            .environmentObject(appState)
+                            .environment(\.showingProjectsList, $showingProjectsList)
+                            .environment(\.isComicSansMode, appState.isComicSansMode)
+                    }
                 }
             }
+            .background(WindowAccessor(windowDelegate: appDelegate.windowDelegate))
             .onAppear {
                 // Pass appState to delegate and window delegate
                 appDelegate.appState = appState
                 appDelegate.windowDelegate.appState = appState
-                print("🟡 onAppear - appState passed to delegates")
             }
         }
         .windowStyle(.hiddenTitleBar)

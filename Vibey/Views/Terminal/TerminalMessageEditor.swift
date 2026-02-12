@@ -9,6 +9,7 @@
 import SwiftUI
 import AppKit
 import CoreGraphics
+import AVFoundation
 
 // MARK: - MessageNSTextView
 
@@ -91,8 +92,28 @@ class DictationController: ObservableObject {
     }
 
     private func startDictation() {
-        textView?.startSystemDictation()
-        installMonitors()
+        // Check mic permission upfront before starting dictation
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            textView?.startSystemDictation()
+            installMonitors()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self?.textView?.startSystemDictation()
+                        self?.installMonitors()
+                    }
+                }
+            }
+        case .denied, .restricted:
+            // Open System Settings so user can grant permission
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                NSWorkspace.shared.open(url)
+            }
+        @unknown default:
+            break
+        }
     }
 
     private func stopDictation() {
@@ -265,6 +286,7 @@ struct MessageInputField: NSViewRepresentable {
 // MARK: - TerminalMessageEditor
 
 struct TerminalMessageEditor: View {
+    @EnvironmentObject var appState: AppState
     @ObservedObject var terminalState: TerminalState
     let isComicSansMode: Bool
     var onClear: (() -> Void)? = nil
@@ -355,17 +377,17 @@ struct TerminalMessageEditor: View {
             onClear?()
         }
 
-        // Send text first
-        if text.contains("\n") {
-            // Multi-line: use bracketed paste mode
-            terminalState.sendText("\u{1b}[200~\(text)\u{1b}[201~")
-        } else {
-            // Single line: just send the text
-            terminalState.sendText(text)
-        }
+        // Track usage on send
+        appState.trackUsage()
 
-        // Send Enter key after a brief delay to ensure Claude Code receives it
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        // Send text directly (no bracketed paste — Claude handles multi-line input)
+        terminalState.sendText(text)
+
+        // Scale delay based on content length so terminal has time to process
+        let delay: Double = text.count > 500 ? 0.3 : 0.05
+
+        // Send Enter key after delay to submit to terminal
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             terminalState.sendText("\r")
         }
 

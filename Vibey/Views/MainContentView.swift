@@ -66,7 +66,7 @@ struct MainContentView: View {
                                         sendPageContext(page)
                                     }
                                 )
-                                .id(pageID) // Force view to refresh when switching pages
+                                .id("\(pageID)-\(isComicSansMode)") // Force view to refresh when switching pages or comic sans mode changes
                             } else {
                                 // Empty state when no page is selected
                                 VStack(spacing: 16) {
@@ -103,6 +103,9 @@ struct MainContentView: View {
 
     private func sendPageContext(_ page: Page) {
         guard let currentProject = appState.currentProject else { return }
+
+        // Track usage on page context send
+        appState.trackUsage()
 
         // Build the page context with line breaks preserved
         var contextText = ""
@@ -714,15 +717,17 @@ struct RichTextEditorWithRef: NSViewRepresentable {
         textView.textContainer?.containerSize = NSSize(width: textContainerWidth, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = false  // We manage width manually to account for margin
 
-        // Default paragraph style for line spacing
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = 8
-        textView.defaultParagraphStyle = paragraphStyle
-
-        // Set default typing attributes - use system font (San Francisco) for body text
+        // Default paragraph style with fixed line height
         let defaultFont = isComicSansMode
             ? NSFont(name: "Comic Sans MS", size: 16) ?? NSFont.systemFont(ofSize: 16)
             : NSFont.systemFont(ofSize: 16)
+        let fixedLineHeight = ceil(defaultFont.ascender - defaultFont.descender + defaultFont.leading) + 8
+
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = 8
+        paragraphStyle.minimumLineHeight = fixedLineHeight
+        paragraphStyle.maximumLineHeight = fixedLineHeight
+        textView.defaultParagraphStyle = paragraphStyle
 
         textView.typingAttributes = [
             .font: defaultFont,
@@ -794,6 +799,9 @@ struct RichTextEditorWithRef: NSViewRepresentable {
         // Don't reload content while there's uncommitted input (e.g., dictation, input method)
         if textView.hasMarkedText() { return }
 
+        // Don't reload content while user has an active selection (prevents selection flicker)
+        if textView.selectedRange().length > 0 { return }
+
         // Compare archived data to detect external changes
         if let textStorage = textView.textStorage,
            let currentData = try? NSKeyedArchiver.archivedData(withRootObject: textStorage, requiringSecureCoding: false) {
@@ -815,12 +823,14 @@ struct RichTextEditorWithRef: NSViewRepresentable {
             unarchiver.requiresSecureCoding = false
             if let attrString = unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey) as? NSAttributedString {
                 textView.textStorage?.setAttributedString(attrString)
+                normalizeParagraphStyles(in: textView)
                 return
             }
         }
         // Fall back to RTF (legacy format)
         if let attrString = NSAttributedString(rtf: content, documentAttributes: nil) {
             textView.textStorage?.setAttributedString(attrString)
+            normalizeParagraphStyles(in: textView)
         }
         // Fall back to plain text
         else if let plainText = String(data: content, encoding: .utf8) {
@@ -836,6 +846,61 @@ struct RichTextEditorWithRef: NSViewRepresentable {
             let attrString = NSAttributedString(string: plainText, attributes: attributes)
             textView.textStorage?.setAttributedString(attrString)
         }
+    }
+
+    /// Ensure all paragraphs have consistent line height, list indentation, and marker font
+    private func normalizeParagraphStyles(in textView: NSTextView) {
+        guard let textStorage = textView.textStorage, textStorage.length > 0 else { return }
+
+        let nsString = textStorage.string as NSString
+        let fullRange = NSRange(location: 0, length: textStorage.length)
+        let markerFont = NSFont.systemFont(ofSize: 16)
+
+        // Fixed line height matching RichNSTextView
+        let fixedLineHeight = ceil(markerFont.ascender - markerFont.descender + markerFont.leading) + 8
+
+        textStorage.beginEditing()
+        nsString.enumerateSubstrings(in: fullRange, options: .byParagraphs) { substring, paragraphRange, _, _ in
+            guard let line = substring else { return }
+
+            let isCheckbox = line.hasPrefix("☐\t") || line.hasPrefix("☑\t")
+            let isBullet = line.hasPrefix("\u{2022}\t") || line.hasPrefix("•\t")
+            let isNumbered = line.range(of: "^\\d+\\.\\t", options: .regularExpression) != nil
+            let isList = isCheckbox || isBullet || isNumbered
+
+            let style = NSMutableParagraphStyle()
+            style.lineSpacing = 8
+            style.minimumLineHeight = fixedLineHeight
+            style.maximumLineHeight = fixedLineHeight
+            if isList {
+                let indentWidth: CGFloat = 20
+                style.headIndent = indentWidth
+                style.firstLineHeadIndent = 0
+                style.tabStops = [NSTextTab(textAlignment: .left, location: indentWidth)]
+                style.defaultTabInterval = indentWidth
+            }
+
+            textStorage.addAttribute(.paragraphStyle, value: style, range: paragraphRange)
+
+            // Normalize font on list marker characters to prevent
+            // fallback fonts with different metrics from causing line height shifts
+            if isList && paragraphRange.length >= 2 {
+                let markerLen: Int
+                if isCheckbox || isBullet {
+                    markerLen = 2 // marker + tab
+                } else {
+                    // Numbered: find tab position
+                    if let tabIdx = line.firstIndex(of: "\t") {
+                        markerLen = line.distance(from: line.startIndex, to: tabIdx) + 1
+                    } else {
+                        markerLen = 2
+                    }
+                }
+                let markerRange = NSRange(location: paragraphRange.location, length: min(markerLen, paragraphRange.length))
+                textStorage.addAttribute(.font, value: markerFont, range: markerRange)
+            }
+        }
+        textStorage.endEditing()
     }
 
     func makeCoordinator() -> Coordinator {

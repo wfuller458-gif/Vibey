@@ -13,6 +13,7 @@ import Combine
 // MARK: - Custom Terminal View with Drag & Drop Support
 class DraggableTerminalView: LocalProcessTerminalView {
     var onFilesDropped: (([URL]) -> Void)?
+    private var isDragOver = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -28,20 +29,58 @@ class DraggableTerminalView: LocalProcessTerminalView {
         registerForDraggedTypes([.fileURL, .URL])
     }
 
+    // MARK: - Drag & Drop
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         if sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) {
+            isDragOver = true
+            updateDragOverHighlight()
             return .copy
         }
         return []
     }
 
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        isDragOver = false
+        updateDragOverHighlight()
+    }
+
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        isDragOver = false
+        updateDragOverHighlight()
+
         guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] else {
             return false
         }
 
         onFilesDropped?(urls)
         return true
+    }
+
+    private func updateDragOverHighlight() {
+        wantsLayer = true
+        if isDragOver {
+            layer?.borderWidth = 2
+            layer?.borderColor = NSColor(calibratedRed: 4/255, green: 89/255, blue: 254/255, alpha: 1.0).cgColor // vibeyBlue
+        } else {
+            layer?.borderWidth = 0
+            layer?.borderColor = nil
+        }
+    }
+
+    // MARK: - Copy Support
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Handle Cmd+C for copy when there's a selection
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "c" {
+            if let selectedText = getSelection(), !selectedText.isEmpty {
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString(selectedText, forType: .string)
+                return true
+            }
+        }
+        return super.performKeyEquivalent(with: event)
     }
 }
 
