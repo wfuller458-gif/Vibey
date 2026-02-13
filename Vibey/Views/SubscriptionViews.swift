@@ -374,10 +374,6 @@ struct TrialBannerView: View {
                 // Gold Early Adopter badge
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "FFD700"))
-
                         Text("Lifetime Member")
                             .font(.lexendBold(size: 14))
                             .foregroundColor(Color(hex: "FFD700"))
@@ -386,20 +382,30 @@ struct TrialBannerView: View {
                     }
 
                     HStack {
-                        Text("EARLY ADOPTER")
-                            .font(.system(size: 9, weight: .bold))
-                            .tracking(1.5)
-                            .foregroundColor(Color(hex: "1C1E22"))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(hex: "FFD700"), Color(hex: "FFA500")],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 7))
+                                .foregroundColor(Color(hex: "1C1E22"))
+
+                            Text("EARLY ADOPTER")
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(1.5)
+                                .foregroundColor(Color(hex: "1C1E22"))
+
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 7))
+                                .foregroundColor(Color(hex: "1C1E22"))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "FFD700"), Color(hex: "FFA500")],
+                                startPoint: .leading,
+                                endPoint: .trailing
                             )
-                            .cornerRadius(4)
+                        )
+                        .cornerRadius(4)
 
                         Spacer()
                     }
