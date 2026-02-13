@@ -370,25 +370,73 @@ struct TrialBannerView: View {
                     .environmentObject(appState)
             }
         } else if appState.subscriptionStatus == .active {
-            // Licensed state
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Licensed")
-                    .font(.atkinsonRegular(size: 16))
-                    .foregroundColor(.vibeyText)
+            if appState.subscriptionPlan == .lifetime {
+                // Gold Early Adopter badge
+                VStack(spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(hex: "FFD700"))
 
-                if appState.subscriptionPlan == .lifetime {
-                    Text("Lifetime access")
-                        .font(.atkinsonRegular(size: 14))
-                        .foregroundColor(.vibeyText.opacity(0.5))
-                } else if daysUntilRenewal > 0 {
-                    Text("Renews in \(daysUntilRenewal) days")
-                        .font(.atkinsonRegular(size: 14))
-                        .foregroundColor(.vibeyText.opacity(0.5))
+                        Text("Lifetime Member")
+                            .font(.lexendBold(size: 14))
+                            .foregroundColor(Color(hex: "FFD700"))
+
+                        Spacer()
+                    }
+
+                    HStack {
+                        Text("EARLY ADOPTER")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundColor(Color(hex: "1C1E22"))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(hex: "FFD700"), Color(hex: "FFA500")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(4)
+
+                        Spacer()
+                    }
                 }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(hex: "1C1E22"))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color(hex: "FFD700").opacity(0.6), Color(hex: "FFA500").opacity(0.3)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
+                )
+            } else {
+                // Legacy subscription - active state
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Licensed")
+                        .font(.atkinsonRegular(size: 16))
+                        .foregroundColor(.vibeyText)
+
+                    if daysUntilRenewal > 0 {
+                        Text("Renews in \(daysUntilRenewal) days")
+                            .font(.atkinsonRegular(size: 14))
+                            .foregroundColor(.vibeyText.opacity(0.5))
+                    }
+                }
+                .padding(12)
+                .background(Color(hex: "1C1E22"))
+                .cornerRadius(8)
             }
-            .padding(12)
-            .background(Color(hex: "1C1E22"))
-            .cornerRadius(8)
         }
     }
 }
