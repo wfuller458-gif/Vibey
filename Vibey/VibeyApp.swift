@@ -140,6 +140,7 @@ struct VibeyApp: App {
     // AppState manages the global state of the app (authentication, current project, etc.)
     @StateObject private var appState = AppState()
     @State private var showingProjectsList = false
+    @State private var showComicSansWarning = false
 
     init() {
         // Load custom fonts at app startup
@@ -202,6 +203,23 @@ struct VibeyApp: App {
                             .environment(\.showingProjectsList, $showingProjectsList)
                             .environment(\.isComicSansMode, appState.isComicSansMode)
                     }
+
+                    // Subscription blocking popups (non-dismissable, blocks app usage)
+                    if appState.subscriptionStatus == .expired {
+                        if appState.hadPaidSubscription {
+                            SubscriptionExpiredPopup(isPresented: .constant(true))
+                                .environmentObject(appState)
+                        } else {
+                            TrialExpiredPopup(isPresented: .constant(true))
+                                .environmentObject(appState)
+                        }
+                    }
+
+                    // Comic Sans warning popup (shown once when entering comic sans trial)
+                    if showComicSansWarning {
+                        ComicSansWarningPopup(isPresented: $showComicSansWarning)
+                            .environmentObject(appState)
+                    }
                 }
             }
             .background(WindowAccessor(windowDelegate: appDelegate.windowDelegate))
@@ -209,6 +227,24 @@ struct VibeyApp: App {
                 // Pass appState to delegate and window delegate
                 appDelegate.appState = appState
                 appDelegate.windowDelegate.appState = appState
+
+                // Show comic sans warning if currently in that state
+                if appState.subscriptionStatus == .comicSansTrial {
+                    let hasSeenWarning = UserDefaults.standard.bool(forKey: "hasSeenComicSansWarning")
+                    if !hasSeenWarning {
+                        showComicSansWarning = true
+                        UserDefaults.standard.set(true, forKey: "hasSeenComicSansWarning")
+                    }
+                }
+            }
+            .onChange(of: appState.subscriptionStatus) { newStatus in
+                if newStatus == .comicSansTrial {
+                    let hasSeenWarning = UserDefaults.standard.bool(forKey: "hasSeenComicSansWarning")
+                    if !hasSeenWarning {
+                        showComicSansWarning = true
+                        UserDefaults.standard.set(true, forKey: "hasSeenComicSansWarning")
+                    }
+                }
             }
         }
         .windowStyle(.hiddenTitleBar)

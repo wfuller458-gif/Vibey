@@ -84,21 +84,43 @@ struct ProjectsListView: View {
                     .padding(.horizontal, 24)
 
                     // Projects list
-                    ScrollView {
+                    if appState.projects.isEmpty {
+                        // Empty state
                         VStack(spacing: 16) {
-                            ForEach(appState.projects) { project in
-                                ProjectRow(
-                                    project: project,
-                                    isSelected: appState.currentProject?.id == project.id,
-                                    onSelect: {
-                                        appState.selectProject(project)
-                                        showingProjectsList.wrappedValue = false
-                                    },
-                                    onDelete: {
-                                        appState.deleteProject(project)
-                                    }
-                                )
-                                .environmentObject(appState)
+                            Spacer()
+
+                            Image(systemName: "folder")
+                                .font(.system(size: 48))
+                                .foregroundColor(.vibeyText.opacity(0.3))
+
+                            Text("No projects yet")
+                                .font(.lexendBold(size: 20))
+                                .foregroundColor(.vibeyText.opacity(0.5))
+
+                            Text("Create your first project to get started")
+                                .font(.atkinsonRegular(size: 14))
+                                .foregroundColor(.vibeyText.opacity(0.3))
+
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 16) {
+                                ForEach(appState.projects) { project in
+                                    ProjectRow(
+                                        project: project,
+                                        isSelected: appState.currentProject?.id == project.id,
+                                        onSelect: {
+                                            appState.selectProject(project)
+                                            showingProjectsList.wrappedValue = false
+                                        },
+                                        onDelete: {
+                                            appState.deleteProject(project)
+                                        }
+                                    )
+                                    .environmentObject(appState)
+                                }
                             }
                         }
                     }

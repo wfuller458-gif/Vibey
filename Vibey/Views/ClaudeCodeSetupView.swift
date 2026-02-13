@@ -10,6 +10,7 @@ import SwiftUI
 struct ClaudeCodeSetupView: View {
     @ObservedObject var detector: ClaudeCodeDetector
     let onComplete: () -> Void
+    @Environment(\.isComicSansMode) var isComicSansMode
 
     var body: some View {
         ZStack {
@@ -55,13 +56,13 @@ struct ClaudeCodeSetupView: View {
 
                         // Title
                         Text("Claude Code CLI Required")
-                            .font(.lexendRegular(size: 32))
+                            .font(.lexendRegular(size: 32, comicSans: isComicSansMode))
                             .foregroundColor(.vibeyText)
                             .kerning(4.8)
 
                         // Description
                         Text("Vibey uses the Claude Code CLI to power its terminal.\nWe'll install it for you automatically.")
-                            .font(.atkinsonRegular(size: 16))
+                            .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
                             .foregroundColor(.vibeyText.opacity(0.8))
                             .kerning(1.12)
                             .multilineTextAlignment(.center)
@@ -76,7 +77,7 @@ struct ClaudeCodeSetupView: View {
                                 .tint(.vibeyBlue)
 
                             Text("Installing Claude Code CLI...")
-                                .font(.atkinsonRegular(size: 16))
+                                .font(.atkinsonRegular(size: 16, comicSans: isComicSansMode))
                                 .foregroundColor(.vibeyText.opacity(0.7))
                         }
                         .padding(32)
@@ -88,7 +89,7 @@ struct ClaudeCodeSetupView: View {
                             }) {
                                 HStack(spacing: 10) {
                                     Text("Install Claude Code")
-                                        .font(.atkinsonRegular(size: 18))
+                                        .font(.atkinsonRegular(size: 18, comicSans: isComicSansMode))
                                         .foregroundColor(.white)
                                         .kerning(1.26)
 
@@ -106,7 +107,7 @@ struct ClaudeCodeSetupView: View {
                             // Error message
                             if let error = detector.installError {
                                 Text(error)
-                                    .font(.atkinsonRegular(size: 14))
+                                    .font(.atkinsonRegular(size: 14, comicSans: isComicSansMode))
                                     .foregroundColor(.red)
                                     .multilineTextAlignment(.center)
                             }
@@ -114,7 +115,7 @@ struct ClaudeCodeSetupView: View {
                             // Manual install option
                             VStack(spacing: 8) {
                                 Text("Or install manually:")
-                                    .font(.atkinsonRegular(size: 14))
+                                    .font(.atkinsonRegular(size: 14, comicSans: isComicSansMode))
                                     .foregroundColor(.vibeyText.opacity(0.6))
 
                                 Text("npm install -g @anthropic-ai/claude-code")
@@ -129,7 +130,7 @@ struct ClaudeCodeSetupView: View {
                                     detector.checkInstallation()
                                 }) {
                                     Text("I've installed it manually")
-                                        .font(.atkinsonRegular(size: 14))
+                                        .font(.atkinsonRegular(size: 14, comicSans: isComicSansMode))
                                         .foregroundColor(.vibeyBlue)
                                         .underline()
                                 }

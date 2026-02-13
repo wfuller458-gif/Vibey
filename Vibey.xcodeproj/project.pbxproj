@@ -30,6 +30,7 @@
 		AA0051 /* FormattingToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0049 /* FormattingToolbar.swift */; };
 		AA0053 /* SpeechRecognitionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0052 /* SpeechRecognitionManager.swift */; };
 		AA0055 /* TerminalMessageEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0054 /* TerminalMessageEditor.swift */; };
+		AA0057 /* UpdateBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0056 /* UpdateBanner.swift */; };
 		BFFFATKBLD /* AtkinsonHyperlegible-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FFATKBLD01 /* AtkinsonHyperlegible-Bold.ttf */; };
 		BFFFATKRG /* AtkinsonHyperlegible-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FFATKRG01 /* AtkinsonHyperlegible-Regular.ttf */; };
 		BFFFLEXBLD /* Lexend-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FFLEXBLD01 /* Lexend-Bold.ttf */; };
@@ -59,6 +60,7 @@
 		AA0049 /* FormattingToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormattingToolbar.swift; sourceTree = "<group>"; };
 		AA0052 /* SpeechRecognitionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognitionManager.swift; sourceTree = "<group>"; };
 		AA0054 /* TerminalMessageEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalMessageEditor.swift; sourceTree = "<group>"; };
+		AA0056 /* UpdateBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateBanner.swift; sourceTree = "<group>"; };
 		AAAAAA /* Vibey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vibey.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FEB03E2BFA18201CB2C1CE30 /* LinkPreviewCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LinkPreviewCard.swift; sourceTree = "<group>"; };
 		FFATKBLD01 /* AtkinsonHyperlegible-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "AtkinsonHyperlegible-Bold.ttf"; path = "Vibey/Fonts/Atkinson_Hyperlegible/AtkinsonHyperlegible-Bold.ttf"; sourceTree = "<group>"; };
@@ -187,6 +189,7 @@
 				AA0048 /* RichTextEditor.swift */,
 				AA0049 /* FormattingToolbar.swift */,
 				FEB03E2BFA18201CB2C1CE30 /* LinkPreviewCard.swift */,
+				AA0056 /* UpdateBanner.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -292,6 +295,7 @@
 				AA0053 /* SpeechRecognitionManager.swift in Sources */,
 				80BEDD56B5FC78A0A5ACD95C /* LinkPreview.swift in Sources */,
 				4FD405CA8230E70F7E1445F2 /* LinkPreviewCard.swift in Sources */,
+				AA0057 /* UpdateBanner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
