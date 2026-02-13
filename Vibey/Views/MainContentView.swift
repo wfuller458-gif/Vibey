@@ -87,6 +87,7 @@ struct MainContentView: View {
                             }
                         }
                         .frame(width: geometry.size.width - sidebarWidth - terminalWidth - 48) // 48 for dividers (24px each)
+                        .zIndex(1) // Ensure floating toolbar renders above terminal panel
 
                         // Draggable divider for terminal
                         DraggableDivider(width: $terminalWidth, minWidth: 300, maxWidth: 800, reverseDirection: true)
