@@ -23,6 +23,7 @@ enum SubscriptionStatus: String, Codable {
 enum SubscriptionPlan: String, Codable {
     case monthly
     case yearly
+    case lifetime
 }
 
 // MARK: - Validation Response
@@ -525,10 +526,13 @@ class AppState: ObservableObject {
                         UserDefaults.standard.set(planString, forKey: "subscriptionPlan")
                     }
 
-                    // Save renewal date
+                    // Save renewal date (nil for lifetime licenses)
                     if let renewsOnTimestamp = response.renewsOn {
                         renewalDate = Date(timeIntervalSince1970: TimeInterval(renewsOnTimestamp))
                         UserDefaults.standard.set(renewalDate, forKey: "renewalDate")
+                    } else {
+                        renewalDate = nil
+                        UserDefaults.standard.removeObject(forKey: "renewalDate")
                     }
 
                     // Mark that user has had a paid subscription (for expired popup logic)

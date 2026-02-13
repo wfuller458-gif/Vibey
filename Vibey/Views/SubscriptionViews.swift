@@ -108,11 +108,11 @@ struct LicenseEntryView: View {
                         .frame(height: 1)
                 }
 
-                // Subscribe button
+                // Purchase button
                 Button(action: {
                     appState.openSubscribePage()
                 }) {
-                    Text("Don't have a license? Subscribe Now")
+                    Text("Don't have a license? Purchase Now")
                         .font(.atkinsonRegular(size: 14))
                         .foregroundColor(.vibeyBlue)
                 }
@@ -154,7 +154,6 @@ struct LicenseEntryView: View {
 
 struct PaywallView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedPlan: SubscriptionPlan = .yearly
     @State private var showingLicenseEntry = false
 
     var body: some View {
@@ -172,7 +171,7 @@ struct PaywallView: View {
                                 .font(.lexendBold(size: 28))
                                 .foregroundColor(.vibeyText)
                         } else {
-                            Text("Subscription Expired")
+                            Text("License Expired")
                                 .font(.lexendBold(size: 28))
                                 .foregroundColor(.vibeyText)
                         }
@@ -182,39 +181,27 @@ struct PaywallView: View {
                             .foregroundColor(.vibeyText)
                     }
 
-                    Text("Choose your plan to continue")
+                    Text("Get lifetime access for a one-time purchase")
                         .font(.atkinsonRegular(size: 16))
                         .foregroundColor(.vibeyText.opacity(0.7))
                 }
 
-                // Plan selection
-                VStack(spacing: 16) {
-                    // Yearly plan (recommended)
-                    PlanOptionView(
-                        plan: .yearly,
-                        price: "$79",
-                        period: "per year",
-                        savings: "Save $29/year",
-                        isSelected: selectedPlan == .yearly,
-                        onSelect: { selectedPlan = .yearly }
-                    )
+                // Lifetime price display
+                VStack(spacing: 8) {
+                    Text("$49.99")
+                        .font(.lexendBold(size: 48))
+                        .foregroundColor(.vibeyText)
 
-                    // Monthly plan
-                    PlanOptionView(
-                        plan: .monthly,
-                        price: "$9",
-                        period: "per month",
-                        savings: nil,
-                        isSelected: selectedPlan == .monthly,
-                        onSelect: { selectedPlan = .monthly }
-                    )
+                    Text("one-time payment")
+                        .font(.atkinsonRegular(size: 14))
+                        .foregroundColor(.vibeyText.opacity(0.6))
                 }
 
-                // Subscribe button
+                // Purchase button
                 Button(action: {
                     appState.openSubscribePage()
                 }) {
-                    Text("Subscribe")
+                    Text("Purchase Vibey")
                         .font(.atkinsonRegular(size: 16))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -224,11 +211,11 @@ struct PaywallView: View {
                 }
                 .buttonStyle(.plain)
 
-                // Already subscribed
+                // Already purchased
                 Button(action: {
                     showingLicenseEntry = true
                 }) {
-                    Text("Already subscribed? Enter license key")
+                    Text("Already purchased? Enter license key")
                         .font(.atkinsonRegular(size: 14))
                         .foregroundColor(.vibeyBlue)
                 }
@@ -249,80 +236,6 @@ struct PaywallView: View {
     }
 }
 
-// MARK: - Plan Option View
-
-struct PlanOptionView: View {
-    let plan: SubscriptionPlan
-    let price: String
-    let period: String
-    let savings: String?
-    let isSelected: Bool
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 16) {
-                // Radio button
-                ZStack {
-                    Circle()
-                        .stroke(isSelected ? Color.vibeyBlue : Color.vibeyCardBorder, lineWidth: 2)
-                        .frame(width: 20, height: 20)
-
-                    if isSelected {
-                        Circle()
-                            .fill(Color.vibeyBlue)
-                            .frame(width: 10, height: 10)
-                    }
-                }
-
-                // Plan details
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(plan == .yearly ? "Yearly" : "Monthly")
-                            .font(.lexendBold(size: 16))
-                            .foregroundColor(.vibeyText)
-
-                        if let savings = savings {
-                            Text(savings)
-                                .font(.atkinsonRegular(size: 11))
-                                .foregroundColor(.green)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.green.opacity(0.1))
-                                .cornerRadius(4)
-                        }
-                    }
-
-                    Text("Billed \(period)")
-                        .font(.atkinsonRegular(size: 12))
-                        .foregroundColor(.vibeyText.opacity(0.6))
-                }
-
-                Spacer()
-
-                // Price
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(price)
-                        .font(.lexendBold(size: 24))
-                        .foregroundColor(.vibeyText)
-
-                    Text(period)
-                        .font(.atkinsonRegular(size: 11))
-                        .foregroundColor(.vibeyText.opacity(0.6))
-                }
-            }
-            .padding(20)
-            .background(isSelected ? Color(hex: "1C1E22") : Color.vibeyBackground)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.vibeyBlue : Color.vibeyCardBorder, lineWidth: isSelected ? 2 : 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Trial/Subscription Banner View
 
 struct TrialBannerView: View {
@@ -330,7 +243,7 @@ struct TrialBannerView: View {
     @State private var showingLicenseEntry = false
 
     var trialProgress: Double {
-        let total: Double = 14.0
+        let total: Double = 7.0  // Each trial phase is 7 days
         let remaining = Double(appState.trialDaysRemaining)
         return remaining / total
     }
@@ -457,29 +370,21 @@ struct TrialBannerView: View {
                     .environmentObject(appState)
             }
         } else if appState.subscriptionStatus == .active {
-            // Subscribed state
+            // Licensed state
             VStack(alignment: .leading, spacing: 8) {
-                Text("Subscribed")
+                Text("Licensed")
                     .font(.atkinsonRegular(size: 16))
                     .foregroundColor(.vibeyText)
 
-                Text("Renews in \(daysUntilRenewal) days")
-                    .font(.atkinsonRegular(size: 14))
-                    .foregroundColor(.vibeyText.opacity(0.5))
-
-                Button(action: {
-                    appState.openSubscriptionPortal()
-                }) {
-                    Text("Manage")
+                if appState.subscriptionPlan == .lifetime {
+                    Text("Lifetime access")
                         .font(.atkinsonRegular(size: 14))
-                        .foregroundColor(.vibeyBlue)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.vibeyBlue.opacity(0.1))
-                        .cornerRadius(8)
+                        .foregroundColor(.vibeyText.opacity(0.5))
+                } else if daysUntilRenewal > 0 {
+                    Text("Renews in \(daysUntilRenewal) days")
+                        .font(.atkinsonRegular(size: 14))
+                        .foregroundColor(.vibeyText.opacity(0.5))
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 4)
             }
             .padding(12)
             .background(Color(hex: "1C1E22"))
@@ -496,7 +401,7 @@ struct SubscriptionSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             // Header
-            Text("Subscription")
+            Text("License")
                 .font(.lexendBold(size: 20))
                 .foregroundColor(.vibeyText)
 
@@ -527,13 +432,13 @@ struct SubscriptionSettingsView: View {
                             Spacer()
 
                             if let plan = appState.subscriptionPlan {
-                                Text(plan == .monthly ? "Monthly" : "Yearly")
+                                Text(plan == .lifetime ? "Lifetime" : plan == .monthly ? "Monthly" : "Yearly")
                                     .font(.lexendBold(size: 13))
                                     .foregroundColor(.vibeyText)
                             }
                         }
 
-                        if let renewalDate = appState.renewalDate {
+                        if appState.subscriptionPlan != .lifetime, let renewalDate = appState.renewalDate {
                             HStack {
                                 Text(appState.subscriptionStatus == .cancelled ? "Expires:" : "Renews:")
                                     .font(.atkinsonRegular(size: 13))
@@ -599,25 +504,6 @@ struct SubscriptionSettingsView: View {
 
                 // Actions
                 VStack(spacing: 12) {
-                    if appState.subscriptionStatus == .active || appState.subscriptionStatus == .cancelled {
-                        Button(action: {
-                            appState.openSubscriptionPortal()
-                        }) {
-                            HStack {
-                                Image(systemName: "creditcard")
-                                    .font(.system(size: 12))
-                                Text("Manage Subscription")
-                                    .font(.atkinsonRegular(size: 14))
-                            }
-                            .foregroundColor(.vibeyBlue)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color(hex: "1C1E22"))
-                            .cornerRadius(6)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
                     if appState.subscriptionStatus == .trial || appState.subscriptionStatus == .expired {
                         Button(action: {
                             appState.openSubscribePage()
@@ -625,7 +511,7 @@ struct SubscriptionSettingsView: View {
                             HStack {
                                 Image(systemName: "star.fill")
                                     .font(.system(size: 12))
-                                Text("Subscribe Now")
+                                Text("Purchase Vibey")
                                     .font(.atkinsonRegular(size: 14))
                             }
                             .foregroundColor(.white)
@@ -677,13 +563,13 @@ struct SubscriptionSettingsView: View {
         case .comicSansTrial:
             return "Comic Sans Mode Active"
         case .active:
-            return "Subscription Active"
+            return appState.subscriptionPlan == .lifetime ? "Lifetime License" : "License Active"
         case .paymentFailed:
             return "Payment Issue"
         case .cancelled:
             return "Cancelled (Active until expiry)"
         case .expired:
-            return "Subscription Expired"
+            return "License Expired"
         }
     }
 }
@@ -734,7 +620,7 @@ struct ComicSansWarningPopup: View {
                     Button(action: {
                         appState.openSubscribePage()
                     }) {
-                        Text("Subscribe to escape Comic Sans")
+                        Text("Purchase to escape Comic Sans")
                             .font(.custom("Comic Sans MS", size: 16))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -792,17 +678,17 @@ struct TrialExpiredPopup: View {
                         .font(.atkinsonRegular(size: 16))
                         .foregroundColor(.vibeyText.opacity(0.8))
 
-                    Text("Subscribe to continue using Vibey")
+                    Text("Purchase Vibey to continue")
                         .font(.atkinsonRegular(size: 16))
                         .foregroundColor(.vibeyText.opacity(0.8))
                 }
                 .multilineTextAlignment(.center)
 
-                // Subscribe button
+                // Purchase button
                 Button(action: {
                     appState.openSubscribePage()
                 }) {
-                    Text("Subscribe Now")
+                    Text("Purchase Vibey")
                         .font(.atkinsonBold(size: 16))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -839,28 +725,28 @@ struct SubscriptionExpiredPopup: View {
             // Popup card
             VStack(spacing: 24) {
                 // Title
-                Text("Subscription Expired")
+                Text("License Expired")
                     .font(.lexendBold(size: 28))
                     .foregroundColor(.vibeyText)
                     .multilineTextAlignment(.center)
 
                 // Message
                 VStack(spacing: 12) {
-                    Text("Your subscription has expired.")
+                    Text("Your license has expired.")
                         .font(.atkinsonRegular(size: 16))
                         .foregroundColor(.vibeyText.opacity(0.8))
 
-                    Text("Please renew to continue using Vibey.")
+                    Text("Please purchase Vibey to continue.")
                         .font(.atkinsonRegular(size: 16))
                         .foregroundColor(.vibeyText.opacity(0.8))
                 }
                 .multilineTextAlignment(.center)
 
-                // Renew button
+                // Purchase button
                 Button(action: {
                     appState.openSubscribePage()
                 }) {
-                    Text("Renew Subscription")
+                    Text("Purchase Vibey")
                         .font(.atkinsonBold(size: 16))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
